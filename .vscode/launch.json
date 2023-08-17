@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'rost'",
+            "name": "Debug executable 'advent_of_code'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=rost",
-                    "--package=rost"
+                    "--bin=advent_of_code",
+                    "--package=advent_of_code"
                 ],
                 "filter": {
-                    "name": "rost",
+                    "name": "advent_of_code",
                     "kind": "bin"
                 }
             },
@@ -25,16 +25,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'rost'",
+            "name": "Debug unit tests in executable 'advent_of_code'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=rost",
-                    "--package=rost"
+                    "--bin=advent_of_code",
+                    "--package=advent_of_code"
                 ],
                 "filter": {
-                    "name": "rost",
+                    "name": "advent_of_code",
                     "kind": "bin"
                 }
             },
