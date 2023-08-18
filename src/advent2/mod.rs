@@ -63,7 +63,7 @@ fn match_score4(round: (RPS, RPS)) -> Option<i32> {
     }
 }
 
-pub fn advent2() -> i32 {
+pub fn advent2() -> String {
     let file_path = "./src/advent2/rock_paper_scissors.txt";
     let contents = fs::read_to_string(file_path).expect("Should have been able to read the file");
 
@@ -75,10 +75,10 @@ pub fn advent2() -> i32 {
         score += match_score3((enemy, me)).unwrap();
     }
 
-    return score;
+    return score.to_string();
 }
 
-pub fn advent2_2() -> i32 {
+pub fn advent2_2() -> String {
     let file_path = "./src/advent2/rock_paper_scissors.txt";
     let contents = fs::read_to_string(file_path).expect("Should have been able to read the file");
 
@@ -90,5 +90,5 @@ pub fn advent2_2() -> i32 {
         score += match_score4((enemy, me)).unwrap();
     }
 
-    return score;
+    return score.to_string();
 }

@@ -7,7 +7,7 @@ fn basic() -> String {
     return fs::read_to_string(file_path).expect("Should have been able to read the file");
 }
 
-pub fn advent3_2() -> i32 {
+pub fn advent3_2() -> String {
     let content = basic();
     let mut lines = content.lines();
     let mut score: usize = 0;
@@ -20,10 +20,10 @@ pub fn advent3_2() -> i32 {
             find_duplicate_in_three((line1.unwrap(), line2.unwrap(), line3.unwrap()));
         score += calc_score(present_in_all);
     }
-    return i32::try_from(score).unwrap();
+    return i32::try_from(score).unwrap().to_string();
 }
 
-pub fn advent3() -> i32 {
+pub fn advent3() -> String {
     let contents = basic();
     let mut score = 0;
 
@@ -33,7 +33,7 @@ pub fn advent3() -> i32 {
         score += calc_score(duplicate);
     }
 
-    return i32::try_from(score).unwrap();
+    return i32::try_from(score).unwrap().to_string();
 }
 
 fn calc_score(chr: char) -> usize {

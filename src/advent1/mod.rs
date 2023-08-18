@@ -21,12 +21,12 @@ fn basic() -> Vec<i32> {
     return grouped;
 }
 
-pub fn advent1() -> i32 {
+pub fn advent1() -> String {
     let result = basic();
-    return *result.iter().max().unwrap();
+    return result.iter().max().unwrap().to_string().to_owned();
 }
 
-pub fn advent1_2() -> i32 {
+pub fn advent1_2() -> String {
     let result = basic();
-    return result.iter().rev().take(3).sum::<i32>();
+    return result.iter().rev().take(3).sum::<i32>().to_string();
 }

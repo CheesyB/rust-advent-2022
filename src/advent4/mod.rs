@@ -21,8 +21,8 @@ impl FromStr for Section {
     }
 }
 
-fn range_overlap(first: Section, second: Section) -> bool {
-    if second.start <= first.end {
+fn range_overlap(first: &Section, second: &Section) -> bool {
+    if first.end >= second.start && first.start <= second.end {
         return true;
     } else {
         return false;
@@ -44,30 +44,22 @@ fn basic() -> String {
     return fs::read_to_string(file_path).expect("Should have been able to read the file");
 }
 
-pub fn advent4_2() -> i32 {
+pub fn advent4_2() -> String {
     let content = basic();
     let mut count: i32 = 0;
-    let mut count_no: i32 = 0;
     for line in content.lines() {
         let mut ranges = line.split(',');
         let start_range = Section::from_str(ranges.next().unwrap()).unwrap();
         let end_range = Section::from_str(ranges.next().unwrap()).unwrap();
-        print!("{:?} | {:?}", start_range, end_range);
-        if range_overlap(start_range, end_range) {
+        if range_overlap(&start_range, &end_range) {
             count += 1;
-            print!("YES ->\n");
-        } else {
-            count_no += 1;
-            print!("NO  -> \n");
         }
     }
 
-    println!("Yes: {}", count);
-    println!("NOs: {}", count_no);
-    return count;
+    return count.to_string();
 }
 
-pub fn advent4() -> i32 {
+pub fn advent4() -> String {
     let content = basic();
     let mut count: i32 = 0;
     for line in content.lines() {
@@ -78,5 +70,5 @@ pub fn advent4() -> i32 {
             count += 1;
         }
     }
-    return count;
+    return count.to_string();
 }
