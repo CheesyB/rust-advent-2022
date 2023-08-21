@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fs;
 use std::rc::Rc;
+use regex::{self, RegexSet, Regex};
 
 fn basic() -> String {
     let file_path = "./src/advent7/source_tree.txt";
@@ -42,26 +43,40 @@ impl TreeNode {
             + "]";
     }
 }
-enum CMD {
-    CD,
-    LS,
+
+struct Command {
+    cmd: String,
+    arg: Option<Vec<String>>,
+    output: Option<Vec<String>>,
 }
 
-struct Command<'a> {
-    cmd: CMD,
-    arg: Option<&'a str>,
-    output: Option<&'a str>,
-}
-fn tag(val: &str) -> impl Fn(VecDeque<&str>) -> bool {
-    let match_tag = move |token: &VecDeque<&str>| &val == token.front().unwrap();
+
+fn tag_contains(pattern: &str) -> impl for<'a> Fn(Vec<&'a str>,VecDeque<&'a str>) -> (Vec<&'a str>, VecDeque<&'a str>) {
+    let matcher = Regex::new(pattern).unwrap();
+    let match_tag = move |mut parsed: Vec<&str>, token: &VecDeque<&str>| {
+        if matcher.is_match(token.front().unwrap()) {
+            let matched = token.pop_front().unwrap();
+            parsed.push(matched);
+        }
+        return (parsed, token);
+    };
     return match_tag;
 }
 
-fn parse_cd_up_cmd(token: &mut VecDeque<&str>) {
-    if tag("$")(token) {
-        token.pop_front();
-        let arg = token.pop_front().unwrap();
+
+fn parse_cd<'a>(token: &'a mut VecDeque<&'a str>) -> (Option<&'a str>, VecDeque<&'a str>) {
+    let (parsed, token) = tag_contains(r"\/|\.\.|[a-zA-Z]")(
+     tag_contains(r"\cd")(
+        tag_contains(r"\$")()));
+    
+    if cmd.is_some() && arg.is_some() {
+        Some(Command {
+            cmd: cmd.unwrap().to_owned(),
+            arg: Some(arg.unwrap().to_owned()),
+            output: None,
+        })
     }
+    let (folder, token) = tag_contains()
 }
 
 fn parse(mut token: VecDeque<&str>) -> Vec<Command> {
