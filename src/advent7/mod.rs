@@ -2,7 +2,14 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::fs;
 use std::rc::Rc;
-use regex::{self, RegexSet, Regex};
+
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::character::complete::{alpha1, char, digit1, newline, space1};
+use nom::combinator::{map_res, recognize};
+use nom::multi::{many1, separated_list1};
+use nom::sequence::{separated_pair, tuple};
+use nom::{Err, IResult, InputTakeAtPosition};
 
 fn basic() -> String {
     let file_path = "./src/advent7/source_tree.txt";
@@ -44,50 +51,97 @@ impl TreeNode {
     }
 }
 
-struct Command {
-    cmd: String,
-    arg: Option<Vec<String>>,
-    output: Option<Vec<String>>,
+#[derive(Debug, PartialEq)]
+enum CMD {
+    CD,
+    LS,
 }
 
+#[derive(Debug)]
+struct Command<'a> {
+    cmd: CMD,
+    arg: Option<String>,
+    output: Option<Vec<LSOutput<'a>>>,
+}
 
-fn tag_contains(pattern: &str) -> impl for<'a> Fn(Vec<&'a str>,VecDeque<&'a str>) -> (Vec<&'a str>, VecDeque<&'a str>) {
-    let matcher = Regex::new(pattern).unwrap();
-    let match_tag = move |mut parsed: Vec<&str>, token: &VecDeque<&str>| {
-        if matcher.is_match(token.front().unwrap()) {
-            let matched = token.pop_front().unwrap();
-            parsed.push(matched);
+impl<'c> Command<'c> {
+    fn from_lsoutput(input: Vec<LSOutput<'c>>) -> Self {
+        Command {
+            cmd: CMD::LS,
+            arg: None,
+            output: Some(input),
         }
-        return (parsed, token);
-    };
-    return match_tag;
+    }
+}
+#[derive(Debug)]
+struct AFile<'a> {
+    size: u32,
+    name: &'a str,
+}
+impl<'b> AFile<'b> {
+    fn new(size: u32, name: &'b str) -> Self {
+        AFile { size, name }
+    }
+}
+#[derive(Debug)]
+struct AFolder<'a> {
+    name: &'a str,
+}
+impl<'b> AFolder<'b> {
+    fn new(name: &'b str) -> Self {
+        AFolder { name }
+    }
 }
 
+#[derive(Debug)]
+enum LSOutput<'a> {
+    FILE(AFile<'a>),
+    FOLDER(AFolder<'a>),
+}
 
-fn parse_cd<'a>(token: &'a mut VecDeque<&'a str>) -> (Option<&'a str>, VecDeque<&'a str>) {
-    let (parsed, token) = tag_contains(r"\/|\.\.|[a-zA-Z]")(
-     tag_contains(r"\cd")(
-        tag_contains(r"\$")()));
-    
-    if cmd.is_some() && arg.is_some() {
-        Some(Command {
-            cmd: cmd.unwrap().to_owned(),
-            arg: Some(arg.unwrap().to_owned()),
+fn parse_cd(input: &str) -> IResult<&str, Command> {
+    let (rest, _) = tag("$ cd ")(input)?;
+    map_res(alt((tag("/"), tag(".."), alpha1)), |new_arg: &str| {
+        Ok::<Command, ()>(Command {
+            cmd: CMD::CD,
+            arg: Some(new_arg.to_owned()),
             output: None,
         })
-    }
-    let (folder, token) = tag_contains()
+    })(rest)
 }
 
-fn parse(mut token: VecDeque<&str>) -> Vec<Command> {
-    return todo!();
+fn file_parser(input: &str) -> IResult<&str, LSOutput> {
+    let (rest, (size, name)) = separated_pair(
+        map_res(digit1, str::parse::<u32>),
+        space1,
+        alt((recognize(separated_pair(alpha1, char('.'), alpha1)), alpha1)),
+    )(input)?;
+    return Ok((rest, LSOutput::FILE(AFile::new(size, name))));
+}
+
+fn folder_parser(input: &str) -> IResult<&str, LSOutput> {
+    let (rest, (_, name)) = tuple((tag("dir "), alpha1::<&str, _>))(input)?;
+    return Ok((rest, LSOutput::FOLDER(AFolder::new(name))));
+}
+
+fn parse_ls(input: &str) -> IResult<&str, Command> {
+    let (rest, _) = tag("$ ls\n")(input)?;
+    let (rest, output) = separated_list1(newline, alt((folder_parser, file_parser)))(rest)?;
+    return Ok((rest, Command::from_lsoutput(output)));
+}
+
+fn build_tree(commands: Vec<Command>) {
+    let tree = TreeNode::new();
+    for cmd in commands {}
 }
 
 pub fn advent7() -> String {
     let cmd_history = basic();
-    let line_free_cmd_history = cmd_history.replace('\n', " ");
-    let token: VecDeque<&str> = line_free_cmd_history.split_whitespace().collect();
-    let commands: Vec<Command> = parse(token);
 
-    return String::from("HAllo");
+    let (rest, commands) =
+        separated_list1(newline, alt((parse_ls, parse_cd)))(&cmd_history).unwrap();
+    assert!(rest == "\n");
+
+    dbg!(commands);
+    return String::from("Hallo");
 }
