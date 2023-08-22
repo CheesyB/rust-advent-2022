@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::VecDeque;
 use std::fs;
 use std::rc::Rc;
 
@@ -7,9 +6,9 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, digit1, newline, space1};
 use nom::combinator::{map_res, recognize};
-use nom::multi::{many1, separated_list1};
+use nom::multi::separated_list1;
 use nom::sequence::{separated_pair, tuple};
-use nom::{Err, IResult, InputTakeAtPosition};
+use nom::IResult;
 
 fn basic() -> String {
     let file_path = "./src/advent7/source_tree.txt";
@@ -37,6 +36,38 @@ impl TreeNode {
     }
 
     //pub fn calc_size(&self) todo!;
+
+    pub fn build_tree(commands: Vec<Command>) -> Rc<RefCell<TreeNode>> {
+        let root = Rc::new(RefCell::new(TreeNode::new()));
+        let mut current = Rc::clone(&root);
+        for cmd in commands {
+            match cmd.cmd {
+                CMD::CD => TreeNode::handle_cd(cmd),
+                CMD::LS => TreeNode::handle_ls(cmd),
+            };
+            if *c == '[' || c.is_numeric() {
+                let child = Rc::new(RefCell::new(TreeNode::new()));
+                current.borrow_mut().children.push(Rc::clone(&child));
+                {
+                    let mut mut_child = child.borrow_mut();
+                    mut_child.parent = Some(Rc::clone(&current));
+                    if c.is_numeric() {
+                        mut_child.value = c.to_digit(10);
+                    }
+                }
+                current = child;
+            } else if *c == ',' || *c == ']' {
+                let current_clone = Rc::clone(&current);
+                current = Rc::clone(current_clone.borrow().parent.as_ref().unwrap());
+            } else {
+                panic!("Unknown character: {}", c);
+            }
+        }
+        return root;
+    }
+
+    fn handle_cd(cmd: Command) {}
+    fn handle_ls(cmd: Command) {}
 
     // misses file
     pub fn print(&self) -> String {
@@ -141,6 +172,8 @@ pub fn advent7() -> String {
     let (rest, commands) =
         separated_list1(newline, alt((parse_ls, parse_cd)))(&cmd_history).unwrap();
     assert!(rest == "\n");
+
+    //let root_node = TreeNode::build_tree(commands);
 
     dbg!(commands);
     return String::from("Hallo");
