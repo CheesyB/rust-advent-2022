@@ -26,6 +26,7 @@ fn main() -> Result<(), std::io::Error> {
         advent8::advent8(),
         advent8::advent8_2(),
         advent9::advent9(),
+        advent9::advent9_2(),
     ];
     println!();
     for (i, res) in results.iter().enumerate() {

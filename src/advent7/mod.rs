@@ -146,6 +146,7 @@ impl Command {
     }
 }
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct AFile {
     size: u32,
     name: String,
