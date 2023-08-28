@@ -228,7 +228,6 @@ pub fn advent7_2() -> String {
     let root = build_dir(commands);
 
     let size_to_delete = 30000000 - (70000000 - root.total_size());
-    println!("{}", size_to_delete);
     let values = &mut vec![];
     let folder_min_size = root
         .total_size_smalest(size_to_delete, values)
