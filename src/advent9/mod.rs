@@ -6,5 +6,7 @@ fn basic() -> String {
 }
 
 pub fn advent9() -> String {
+    let content = basic();
+    dbg!(content);
     return "Hallo".to_string();
 }
