@@ -1,5 +1,6 @@
 mod advent1;
 mod advent10;
+mod advent11;
 mod advent2;
 mod advent3;
 mod advent4;
@@ -32,6 +33,7 @@ fn main() -> Result<(), std::io::Error> {
         advent9::advent9_2(),
         advent10::advent10(),
         advent10::advent10_2(),
+        advent11::advent11(),
     ];
     println!();
     for (i, res) in results.iter().enumerate() {
