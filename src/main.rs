@@ -34,6 +34,7 @@ fn main() -> Result<(), std::io::Error> {
         advent10::advent10(),
         advent10::advent10_2(),
         advent11::advent11(),
+        advent11::advent11_2(),
     ];
     println!();
     for (i, res) in results.iter().enumerate() {

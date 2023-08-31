@@ -1,80 +1,135 @@
-use std::vec;
+use std::borrow::BorrowMut;
+use std::cell::RefCell;
+use std::collections::VecDeque;
 
 use crate::helper;
 
-use nom::{self, character::complete::newline, multi::separated_list1, IResult};
+use self::parsing::ValueToken;
 
-#[derive(Debug)]
-pub struct Monkey<'a> {
-    items: Vec<i32>,
-    operation: (&'a str, i32), // (instruction, argument(alpha, same))
-    test: i32,                 // devisible argument
-    monkey_index_true: usize,
-    monkey_index_false: usize,
+#[derive(Debug, Clone)]
+pub struct Monkey {
+    items: RefCell<VecDeque<ValueToken>>,
+    inspecting_count: RefCell<usize>,
+    operation: (parsing::ArithmeticToken, parsing::ValueToken), // (instruction, argument(alpha, same))
+    test: i64,                                                  // devisible argument
+    bool_indices: (usize, usize),
 }
 
 mod parsing {
-    use std::num::ParseIntError;
     use std::str::FromStr;
 
     use nom::branch::alt;
     use nom::bytes::complete::tag;
-    use nom::character::complete::{alpha1, alphanumeric1, digit1, i32, space1};
-    use nom::combinator::{map_res, recognize};
-    use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
+    use nom::character::complete::newline;
+    use nom::character::complete::{alpha1, digit1, i64, multispace1, space1};
+    use nom::combinator::map_res;
+    use nom::multi::separated_list1;
+    use nom::sequence::{delimited, tuple};
+    use nom::IResult;
 
     use super::*;
 
-    #[derive(Debug, PartialEq)]
-    pub enum Token {
-        CONST(i32),
-        OLD(Option<i32>),
+    #[derive(Debug, PartialEq, Copy, Clone)]
+    pub enum ArithmeticToken {
         MULT,
         ADD,
     }
+    #[derive(Debug, PartialEq, Copy, Clone)]
+    pub enum ValueToken {
+        CONST(i64),
+        REF,
+    }
 
-    impl FromStr for Token {
+    impl FromStr for ValueToken {
         type Err = ();
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             match s {
-                "OLD" => Ok(Token::OLD(None)),
-                "*" => Ok(Token::MULT),
-                "+" => Ok(Token::ADD),
-                dig => Ok(Token::CONST(dig.parse::<i32>().unwrap())),
+                "OLD" => Ok(ValueToken::REF),
+                dig => Ok(ValueToken::CONST(dig.parse::<i64>().unwrap())),
             }
         }
     }
 
-    fn to_int(input: &str) -> Result<i32, ParseIntError> {
-        i32::from_str_radix(input, 10)
+    impl std::ops::Add for ValueToken {
+        type Output = i64;
+
+        fn add(self, rhs: Self) -> Self::Output {
+            let val_l = match self {
+                ValueToken::CONST(val) => val,
+                ValueToken::REF => panic!("REF for lhs not allowed"),
+            };
+            let val_r = match rhs {
+                ValueToken::CONST(val) => val,
+                ValueToken::REF => val_l,
+            };
+            val_l + val_r
+        }
+    }
+    impl std::ops::Mul for ValueToken {
+        type Output = i64;
+
+        fn mul(self, rhs: Self) -> Self::Output {
+            let val_l = match self {
+                ValueToken::CONST(val) => val,
+                ValueToken::REF => panic!("REF not allowed on rhs"),
+            };
+            let val_r = match rhs {
+                ValueToken::CONST(val) => val,
+                ValueToken::REF => val_l,
+            };
+            val_l * val_r
+        }
     }
 
-    fn heading<'a>(input: &'a str) -> IResult<&str, i32> {
-        let result = delimited(tag("Monkey "), digit1, tag(":\n"))(input)?;
-        Ok((result.0, i32::from_str_radix(result.1, 10).unwrap()))
+    impl FromStr for ArithmeticToken {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "*" => Ok(ArithmeticToken::MULT),
+                "+" => Ok(ArithmeticToken::ADD),
+                &_ => panic!("not math"),
+            }
+        }
     }
 
-    fn items<'a>(input: &'a str) -> IResult<&'a str, Vec<i32>> {
-        let result = delimited(
-            tag("Starting items: "),
-            separated_list1(tag(", "), digit1),
-            tag("\n"),
-        )(input)?;
-        Ok((
-            result.0,
-            result.1.iter().map(|d| d.parse::<i32>().unwrap()).collect(),
-        ))
+    impl ArithmeticToken {
+        pub fn apply(self, lhs: ValueToken, rhs: ValueToken) -> i64 {
+            match self {
+                ArithmeticToken::MULT => lhs * rhs,
+                ArithmeticToken::ADD => lhs + rhs,
+            }
+        }
     }
 
-    fn divisor<'a>(input: &'a str) -> IResult<&'a str, Token> {
+    fn heading<'a>(input: &'a str) -> IResult<&str, i64> {
+        delimited(tag("Monkey "), i64, tag(":\n"))(input)
+    }
+
+    fn items<'a>(input: &'a str) -> IResult<&'a str, RefCell<VecDeque<ValueToken>>> {
+        let (input, _) = multispace1(input)?;
         map_res(
-            delimited(tag("Test: divisible by "), i32, tag("\n")),
-            |int| Ok::<Token, nom::Err<nom::error::Error<&'a str>>>(Token::CONST(int)),
+            delimited(
+                tag("Starting items: "),
+                separated_list1(tag(", "), i64),
+                tag("\n"),
+            ),
+            |v| {
+                Ok::<RefCell<VecDeque<ValueToken>>, nom::Err<nom::error::Error<&'a str>>>(
+                    RefCell::new(v.iter().map(|i| ValueToken::CONST(i.clone())).collect()),
+                )
+            },
         )(input)
     }
 
-    fn operation<'a>(input: &'a str) -> IResult<&'a str, (Token, Token)> {
+    fn divisor<'a>(input: &'a str) -> IResult<&'a str, i64> {
+        let (input, _) = multispace1(input)?;
+        delimited(tag("Test: divisible by "), i64, tag("\n"))(input)
+    }
+
+    fn operation<'a>(input: &'a str) -> IResult<&'a str, (ArithmeticToken, ValueToken)> {
+        let (input, _) = multispace1(input)?;
         map_res(
             delimited(
                 tag("Operation: new = old "),
@@ -82,59 +137,184 @@ mod parsing {
                 tag("\n"),
             ),
             |(arithmetic, _, constant)| {
-                Ok::<(Token, Token), nom::Err<nom::error::Error<&'a str>>>((
-                    Token::from_str(arithmetic).unwrap(),
-                    Token::from_str(constant).unwrap(),
+                Ok::<(ArithmeticToken, ValueToken), nom::Err<nom::error::Error<&'a str>>>((
+                    ArithmeticToken::from_str(arithmetic).unwrap(),
+                    match constant {
+                        "old" => ValueToken::REF,
+                        c => ValueToken::from_str(c).unwrap(),
+                    },
                 ))
             },
         )(input)
     }
 
-    fn predicate<'a>(input: &'a str) -> IResult<&'a str, i32> {
-
-    fn parse_monkey<'a>(input: &'a str) -> IResult<&str, Monkey<'a>> {
-        let monkey = Monkey {
-            items: vec![],
-            operation: ("-", 20),
-            test: 19,
-            monkey_index_false: 0,
-            monkey_index_true: 1,
-        };
-        Ok(("rest", monkey))
+    fn predicate<'a>(input: &'a str) -> IResult<&'a str, (usize, usize)> {
+        let (input, _) = multispace1(input)?;
+        let (input, true_index) =
+            delimited(tag("If true: throw to monkey "), i64, tag("\n"))(input)?;
+        let (input, _) = multispace1(input)?;
+        let (input, false_index) =
+            delimited(tag("If false: throw to monkey "), i64, tag("\n"))(input)?;
+        Ok((input, (true_index as usize, false_index as usize)))
     }
 
-    pub fn parse<'a>(input: &'a str) -> IResult<&str, Vec<Monkey<'a>>> {
+    fn parse_monkey<'a>(input: &'a str) -> IResult<&str, Monkey> {
+        let (input, _) = heading(input)?;
+        let (input, items) = items(input)?;
+        let (input, operation) = operation(input)?;
+        let (input, test) = divisor(input)?;
+        let (output, indices) = predicate(input)?;
+        Ok((
+            output,
+            Monkey {
+                items,
+                inspecting_count: RefCell::new(0),
+                operation,
+                test,
+                bool_indices: indices,
+            },
+        ))
+    }
+
+    pub fn parse<'a>(input: &'a str) -> IResult<&str, Vec<Monkey>> {
         separated_list1(newline, parse_monkey)(input)
     }
     #[cfg(test)]
     mod tests {
         use super::*;
         static TEST_MONKEY: &str = "Monkey 1:
-Starting items: 78, 74, 88, 89, 50
-Operation: new = old * 11
-Test: divisible by 5
-    If true: throw to monkey 3
-    If false: throw to monkey 5";
+    Starting items: 78, 74, 88, 89, 50
+    Operation: new = old * 11
+    Test: divisible by 5
+        If true: throw to monkey 3
+        If false: throw to monkey 5
+    ";
 
         #[test]
-        fn parse_headline() {
+        fn parse_monkey_test() {
             let (out1, monkey_number) = heading(TEST_MONKEY).unwrap();
             let (out2, items) = items(out1).unwrap();
             let (out4, operation) = operation(out2).unwrap();
             let (out5, div) = divisor(out4).unwrap();
+            let (_, indices) = predicate(out5).unwrap();
 
             assert_eq!(monkey_number, 1);
-            assert_eq!(items, vec![78, 74, 88, 89, 50]);
-            assert_eq!(operation, (Token::MULT, Token::CONST(11)));
-            assert_eq!(div, Token::CONST(5));
+            assert_eq!(
+                *items.borrow(),
+                vec![
+                    ValueToken::CONST(78),
+                    ValueToken::CONST(74),
+                    ValueToken::CONST(88),
+                    ValueToken::CONST(89),
+                    ValueToken::CONST(50)
+                ]
+            );
+            assert_eq!(operation, (ArithmeticToken::MULT, ValueToken::CONST(11)));
+            assert_eq!(div, 5);
+            assert_eq!(indices, (3, 5));
         }
     }
 }
 
-pub fn advent11() -> String {
-    let content = helper::read_puzzle_input("./src/advent10/signal.txt");
-    let monkies = parsing::parse(&content);
-    println!("{:?}", monkies);
+fn print_monkies(monkies: &Vec<Monkey>) {
+    for (count, mon) in monkies.iter().enumerate() {
+        print!("{}", count);
+        print_monkey(mon);
+    }
+    print!("\n")
+}
+fn print_monkey(mon: &Monkey) {
+    print!(
+        "Monkey: {:?}\n",
+        mon.items
+            .borrow()
+            .iter()
+            .map(|c| {
+                match c {
+                    ValueToken::CONST(val) => *val,
+                    _ => panic!(),
+                }
+            })
+            .collect::<Vec<i64>>()
+    );
+}
 
-    "hallo".to_string()
+pub fn advent11_2() -> String {
+    let content = helper::read_puzzle_input("./src/advent11/monkey-business.txt");
+    let (rest, monkies) = parsing::parse(&content).unwrap();
+    println!("{:?}", rest);
+
+    for i in 1..=20 {
+        println!("ROUND: {}", i);
+        for (c, monkey) in monkies.iter().enumerate() {
+            {
+                while let Some(lhs) = monkey.items.borrow_mut().pop_front() {
+                    let mut worry_level = monkey.operation.0.apply(lhs, monkey.operation.1);
+                    *monkey.inspecting_count.borrow_mut() += 1;
+                    if worry_level % monkey.test == 0 {
+                        //println!("{c} From: {}, To: {} -> true", c, monkey.bool_indices.0);
+                        monkies[monkey.bool_indices.0]
+                            .items
+                            .borrow_mut()
+                            .push_back(ValueToken::CONST(worry_level));
+                    } else {
+                        //println!("{c} From: {}, To: {} -> false", c, monkey.bool_indices.0);
+                        monkies[monkey.bool_indices.1]
+                            .items
+                            .borrow_mut()
+                            .push_back(ValueToken::CONST(worry_level));
+                    }
+                }
+                print_monkies(&monkies)
+            }
+        }
+    }
+    let mut business: Vec<usize> = monkies
+        .iter()
+        .map(|m| m.inspecting_count.borrow().clone())
+        .collect();
+    business.sort();
+    dbg!(&business);
+    let mut iter = business.iter().rev().take(2);
+    (iter.next().unwrap() * iter.next().unwrap()).to_string()
+}
+
+pub fn advent11() -> String {
+    let content = helper::read_puzzle_input("./src/advent11/monkey-business.txt");
+    let (rest, monkies) = parsing::parse(&content).unwrap();
+    println!("{:?}", rest);
+
+    for i in 1..=20 {
+        println!("ROUND: {}", i);
+        for (c, monkey) in monkies.iter().enumerate() {
+            {
+                while let Some(lhs) = monkey.items.borrow_mut().pop_front() {
+                    *monkey.inspecting_count.borrow_mut() += 1;
+                    worry_level = (worry_level as f32 / 3.0).floor() as i64;
+                    if worry_level % monkey.test == 0 {
+                        //println!("{c} From: {}, To: {} -> true", c, monkey.bool_indices.0);
+                        monkies[monkey.bool_indices.0]
+                            .items
+                            .borrow_mut()
+                            .push_back(ValueToken::CONST(worry_level));
+                    } else {
+                        //println!("{c} From: {}, To: {} -> false", c, monkey.bool_indices.0);
+                        monkies[monkey.bool_indices.1]
+                            .items
+                            .borrow_mut()
+                            .push_back(ValueToken::CONST(worry_level));
+                    }
+                }
+                print_monkies(&monkies)
+            }
+        }
+    }
+    let mut business: Vec<usize> = monkies
+        .iter()
+        .map(|m| m.inspecting_count.borrow().clone())
+        .collect();
+    business.sort();
+    dbg!(&business);
+    let mut iter = business.iter().rev().take(2);
+    (iter.next().unwrap() * iter.next().unwrap()).to_string()
 }
