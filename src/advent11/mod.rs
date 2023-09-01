@@ -1,6 +1,5 @@
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use crate::helper;
 
@@ -9,6 +8,14 @@ use self::parsing::ValueToken;
 #[derive(Debug, Clone)]
 pub struct Monkey {
     items: RefCell<VecDeque<ValueToken>>,
+    inspecting_count: RefCell<usize>,
+    operation: (parsing::ArithmeticToken, parsing::ValueToken), // (instruction, argument(alpha, same))
+    test: i64,                                                  // devisible argument
+    bool_indices: (usize, usize),
+}
+
+pub struct Monkey2 {
+    items: RefCell<VecDeque<HashMap<i64, ValueToken>>>,
     inspecting_count: RefCell<usize>,
     operation: (parsing::ArithmeticToken, parsing::ValueToken), // (instruction, argument(alpha, same))
     test: i64,                                                  // devisible argument
@@ -123,6 +130,25 @@ mod parsing {
         )(input)
     }
 
+    fn items2<'a>(input: &'a str) -> IResult<&'a str, RefCell<VecDeque<HashMap<i64, ValueToken>>>> {
+        let module_test: [i64; 8] = [2, 3, 5, 7, 11, 13, 17, 19];
+        let (input, _) = multispace1(input)?;
+        let (output, items) = delimited(
+            tag("Starting items: "),
+            separated_list1(tag(", "), i64),
+            tag("\n"),
+        )(input)?;
+        let worry_map: VecDeque<HashMap<i64, ValueToken>> = items
+            .iter()
+            .map(|i: &i64| {
+                HashMap::from_iter(module_test.map(move |j| (j, ValueToken::CONST(i % j))))
+            })
+            .collect();
+
+        //Vec<HashMap<u32, u32>>
+        Ok((output, RefCell::from(worry_map)))
+    }
+
     fn divisor<'a>(input: &'a str) -> IResult<&'a str, i64> {
         let (input, _) = multispace1(input)?;
         delimited(tag("Test: divisible by "), i64, tag("\n"))(input)
@@ -175,9 +201,30 @@ mod parsing {
             },
         ))
     }
+    fn parse_monkey2<'a>(input: &'a str) -> IResult<&str, Monkey2> {
+        let (input, _) = heading(input)?;
+        let (input, items2) = items2(input)?;
+        let (input, operation) = operation(input)?;
+        let (input, test) = divisor(input)?;
+        let (output, indices) = predicate(input)?;
+        Ok((
+            output,
+            Monkey2 {
+                items: items2,
+                inspecting_count: RefCell::new(0),
+                operation,
+                test,
+                bool_indices: indices,
+            },
+        ))
+    }
 
     pub fn parse<'a>(input: &'a str) -> IResult<&str, Vec<Monkey>> {
         separated_list1(newline, parse_monkey)(input)
+    }
+
+    pub fn parse2<'a>(input: &'a str) -> IResult<&str, Vec<Monkey2>> {
+        separated_list1(newline, parse_monkey2)(input)
     }
     #[cfg(test)]
     mod tests {
@@ -241,31 +288,56 @@ fn print_monkey(mon: &Monkey) {
 
 pub fn advent11_2() -> String {
     let content = helper::read_puzzle_input("./src/advent11/monkey-business.txt");
-    let (rest, monkies) = parsing::parse(&content).unwrap();
+    let (rest, monkies) = parsing::parse2(&content).unwrap();
     println!("{:?}", rest);
 
-    for i in 1..=20 {
+    for i in 1..=10000 {
         println!("ROUND: {}", i);
         for (c, monkey) in monkies.iter().enumerate() {
             {
-                while let Some(lhs) = monkey.items.borrow_mut().pop_front() {
-                    let mut worry_level = monkey.operation.0.apply(lhs, monkey.operation.1);
+                while let Some(mut worry) = monkey.items.borrow_mut().pop_front() {
                     *monkey.inspecting_count.borrow_mut() += 1;
-                    if worry_level % monkey.test == 0 {
+
+                    match monkey.operation.0 {
+                        parsing::ArithmeticToken::MULT => {
+                            worry = worry
+                                .iter_mut()
+                                .map(|(i, j)| {
+                                    (*i, ValueToken::CONST((*j * monkey.operation.1) % *i))
+                                })
+                                .collect();
+                            ()
+                        }
+                        parsing::ArithmeticToken::ADD => {
+                            worry = worry
+                                .iter_mut()
+                                .map(|(i, j)| {
+                                    (*i, ValueToken::CONST((*j + monkey.operation.1) % *i))
+                                })
+                                .collect();
+                            ()
+                        }
+                    };
+                    let case = match worry.get(&monkey.test).unwrap() {
+                        ValueToken::CONST(val) => val.clone(),
+                        ValueToken::REF => panic!("wrong"),
+                    };
+
+                    if case == 0 {
                         //println!("{c} From: {}, To: {} -> true", c, monkey.bool_indices.0);
                         monkies[monkey.bool_indices.0]
                             .items
                             .borrow_mut()
-                            .push_back(ValueToken::CONST(worry_level));
+                            .push_back(worry);
                     } else {
                         //println!("{c} From: {}, To: {} -> false", c, monkey.bool_indices.0);
                         monkies[monkey.bool_indices.1]
                             .items
                             .borrow_mut()
-                            .push_back(ValueToken::CONST(worry_level));
+                            .push_back(worry);
                     }
                 }
-                print_monkies(&monkies)
+                //print_monkies(&monkies)
             }
         }
     }
@@ -289,7 +361,9 @@ pub fn advent11() -> String {
         for (c, monkey) in monkies.iter().enumerate() {
             {
                 while let Some(lhs) = monkey.items.borrow_mut().pop_front() {
+                    let mut worry_level = monkey.operation.0.apply(lhs, monkey.operation.1);
                     *monkey.inspecting_count.borrow_mut() += 1;
+
                     worry_level = (worry_level as f32 / 3.0).floor() as i64;
                     if worry_level % monkey.test == 0 {
                         //println!("{c} From: {}, To: {} -> true", c, monkey.bool_indices.0);
