@@ -263,6 +263,7 @@ mod parsing {
     }
 }
 
+#[allow(dead_code)]
 fn print_monkies(monkies: &Vec<Monkey>) {
     for (count, mon) in monkies.iter().enumerate() {
         print!("{}", count);
@@ -270,6 +271,7 @@ fn print_monkies(monkies: &Vec<Monkey>) {
     }
     print!("\n")
 }
+#[allow(dead_code)]
 fn print_monkey(mon: &Monkey) {
     print!(
         "Monkey: {:?}\n",
@@ -286,14 +288,15 @@ fn print_monkey(mon: &Monkey) {
     );
 }
 
+#[allow(dead_code)]
+// This is an abomination, sorry
 pub fn advent11_2() -> String {
     let content = helper::read_puzzle_input("./src/advent11/monkey-business.txt");
     let (rest, monkies) = parsing::parse2(&content).unwrap();
     println!("{:?}", rest);
 
-    for i in 1..=10000 {
-        println!("ROUND: {}", i);
-        for (c, monkey) in monkies.iter().enumerate() {
+    for _i in 1..=10000 {
+        for (_c, monkey) in monkies.iter().enumerate() {
             {
                 while let Some(mut worry) = monkey.items.borrow_mut().pop_front() {
                     *monkey.inspecting_count.borrow_mut() += 1;
@@ -324,20 +327,17 @@ pub fn advent11_2() -> String {
                     };
 
                     if case == 0 {
-                        //println!("{c} From: {}, To: {} -> true", c, monkey.bool_indices.0);
                         monkies[monkey.bool_indices.0]
                             .items
                             .borrow_mut()
                             .push_back(worry);
                     } else {
-                        //println!("{c} From: {}, To: {} -> false", c, monkey.bool_indices.0);
                         monkies[monkey.bool_indices.1]
                             .items
                             .borrow_mut()
                             .push_back(worry);
                     }
                 }
-                //print_monkies(&monkies)
             }
         }
     }
@@ -346,19 +346,16 @@ pub fn advent11_2() -> String {
         .map(|m| m.inspecting_count.borrow().clone())
         .collect();
     business.sort();
-    dbg!(&business);
     let mut iter = business.iter().rev().take(2);
     (iter.next().unwrap() * iter.next().unwrap()).to_string()
 }
 
 pub fn advent11() -> String {
     let content = helper::read_puzzle_input("./src/advent11/monkey-business.txt");
-    let (rest, monkies) = parsing::parse(&content).unwrap();
-    println!("{:?}", rest);
+    let (_rest, monkies) = parsing::parse(&content).unwrap();
 
-    for i in 1..=20 {
-        println!("ROUND: {}", i);
-        for (c, monkey) in monkies.iter().enumerate() {
+    for _i in 1..=20 {
+        for (_c, monkey) in monkies.iter().enumerate() {
             {
                 while let Some(lhs) = monkey.items.borrow_mut().pop_front() {
                     let mut worry_level = monkey.operation.0.apply(lhs, monkey.operation.1);
@@ -366,20 +363,17 @@ pub fn advent11() -> String {
 
                     worry_level = (worry_level as f32 / 3.0).floor() as i64;
                     if worry_level % monkey.test == 0 {
-                        //println!("{c} From: {}, To: {} -> true", c, monkey.bool_indices.0);
                         monkies[monkey.bool_indices.0]
                             .items
                             .borrow_mut()
                             .push_back(ValueToken::CONST(worry_level));
                     } else {
-                        //println!("{c} From: {}, To: {} -> false", c, monkey.bool_indices.0);
                         monkies[monkey.bool_indices.1]
                             .items
                             .borrow_mut()
                             .push_back(ValueToken::CONST(worry_level));
                     }
                 }
-                print_monkies(&monkies)
             }
         }
     }
@@ -388,7 +382,6 @@ pub fn advent11() -> String {
         .map(|m| m.inspecting_count.borrow().clone())
         .collect();
     business.sort();
-    dbg!(&business);
     let mut iter = business.iter().rev().take(2);
     (iter.next().unwrap() * iter.next().unwrap()).to_string()
 }
