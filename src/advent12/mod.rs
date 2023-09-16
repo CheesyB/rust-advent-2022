@@ -1,15 +1,17 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, convert::identity, rc::Rc, vec};
 
 use crate::{
-    advent12::tree::{breath_first, get_path_length, print_node, Position},
+    advent12::tree::{breath_first, capsule_bfs, get_path, print_positions, Position},
     helper,
 };
 
 mod tree {
+    use crate::helper;
     use std::{
         cell::RefCell,
         collections::VecDeque,
         convert::identity,
+        fs,
         rc::{Rc, Weak},
         vec,
     };
@@ -92,12 +94,16 @@ mod tree {
             self.children.push(child)
         }
 
-        pub fn get_parent(&self) -> Rc<RefCell<Node>> {
-            self.parent.as_ref().unwrap().upgrade().unwrap()
+        // why does it only work when I unwrap the parent inside the impl?
+        pub fn get_parent(&self) -> Option<Rc<RefCell<Node>>> {
+            if self.parent.as_ref().is_none() {
+                return None;
+            }
+            self.parent.as_ref().unwrap().upgrade()
         }
 
         fn can_reach(&self, next: char) -> bool {
-            if (self.val as u8) <= next as u8 + 1 {
+            if (self.val as u8 + 1) >= next as u8 && next != 'E' {
                 return true;
             }
             if next == 'E' && (self.val == 'y' || self.val == 'z') {
@@ -157,36 +163,40 @@ mod tree {
 
     pub fn add_child(parent: &Rc<RefCell<Node>>, child: &Rc<RefCell<Node>>) {
         child.as_ref().borrow_mut().parent = Some(Rc::downgrade(parent));
-        parent.as_ref().borrow_mut().add_child(Rc::clone(&child));
+        parent.as_ref().borrow_mut().add_child(Rc::clone(child));
     }
-    pub fn breath_first(root: Rc<RefCell<Node>>, grid: &Grid) -> Rc<RefCell<Node>> {
+    pub fn breath_first(root: &Rc<RefCell<Node>>, grid: &Grid) -> Option<Rc<RefCell<Node>>> {
         let mut stack = VecDeque::new();
         let mut visited = vec![vec![false; grid[0].len()]; grid.len()];
         visited[root.as_ref().borrow().position.row][root.as_ref().borrow().position.col] = true;
         stack.extend(get_adjacent_pos(&root, grid, &visited));
-        consume_stack(&mut stack, grid, &mut visited).unwrap()
+        consume_stack(&mut stack, grid, &mut visited)
     }
-    pub fn get_path_length(mut end_node: Rc<RefCell<Node>>) -> usize {
-        let mut path_count: usize = 0;
+    pub fn get_path(mut end_node: Rc<RefCell<Node>>) -> Vec<Position> {
+        let mut positions = vec![];
+        positions.push(end_node.borrow().position.clone());
         loop {
-            println!("{} ", path_count);
             if end_node.as_ref().borrow().val == 'S' {
                 break;
             }
-            let _tmp = &end_node
-                .as_ref()
-                .borrow()
-                .parent
-                .as_ref()
-                .unwrap()
-                .clone()
-                .upgrade()
-                .unwrap();
-            let tmp2 = _tmp.upgrade().unwrap();
-            end_node = tmp2;
-            path_count += 1;
+            let tmp = end_node.borrow_mut().get_parent();
+            if tmp.is_none() {
+                break;
+            }
+            let un_tmp = tmp.unwrap();
+            positions.push(un_tmp.borrow().position.clone());
+            end_node = un_tmp;
         }
-        path_count
+        positions
+    }
+    pub fn capsule_bfs(start_position: &Position, grid: &Grid) -> Option<usize> {
+        let root = Rc::new(RefCell::new(Node::new(start_position.clone(), 'a')));
+        let end_node = breath_first(&root, grid);
+        if end_node.is_some() {
+            let path = get_path(end_node.unwrap());
+            return Some(path.len() - 1);
+        }
+        None
     }
 
     fn consume_stack(
@@ -199,29 +209,75 @@ mod tree {
             for node in new_nodes.iter() {
                 visited[node.as_ref().borrow().position.row][node.as_ref().borrow().position.col] =
                     true;
-                print!("{}, ", node.borrow().val);
             }
             if node.borrow().val == 'E' {
-                println!("Found End");
                 return Some(node);
             }
             stack.extend(new_nodes.into_iter());
-            println!();
         }
-        println!("End not found");
+        //println!("End not found");
         None
     }
-    #[warn(dead_code)]
+    #[allow(dead_code)]
     pub fn print_node(node: Rc<RefCell<Node>>) {
         let binding = Rc::try_unwrap(node).unwrap_or_else(|_| panic!("not so good"));
         let node = binding.into_inner();
         dbg!(&node);
+    }
+    pub fn print_positions(positions: &Vec<Position>) {
+        let mut buff = String::new();
+        let content = helper::read_puzzle_input("./src/advent12/elevation.txt");
+        let mut grid: Vec<Vec<char>> = vec![vec![]];
+
+        for (row, line) in content.lines().enumerate() {
+            grid.push(vec![]);
+            for ch in line.chars() {
+                grid[row].push(ch);
+            }
+        }
+        for pos in positions.into_iter() {
+            grid[pos.row][pos.col] = '#';
+        }
+        for row in grid.iter() {
+            for col in row.iter() {
+                buff.push_str(col.to_string().as_str());
+            }
+            buff.push_str("\n".to_string().as_str());
+        }
+        fs::write("./src/advent12/path.txt", buff.to_string()).expect("no damage");
     }
 }
 
 type Grid = Vec<Vec<char>>;
 type Visited = Vec<Vec<bool>>;
 
+pub fn advent12_2() -> String {
+    let content = helper::read_puzzle_input("./src/advent12/elevation.txt");
+    let mut grid: Vec<Vec<char>> = vec![vec![]];
+    let mut start_positions = vec![];
+
+    for (row, line) in content.lines().enumerate() {
+        grid.push(vec![]);
+        for (col, ch) in line.chars().enumerate() {
+            grid[row].push(ch);
+            if ch == 'S' || ch == 'a' {
+                start_positions.push(Position { row, col });
+            }
+        }
+    }
+    let mut all_paths_from_a: Vec<Option<usize>> = vec![];
+    for (_count, pos) in start_positions.iter().enumerate() {
+        //println!("{}: {:?}", _count, pos);
+        let path_len = capsule_bfs(pos, &grid);
+        all_paths_from_a.push(path_len);
+    }
+    all_paths_from_a
+        .into_iter()
+        .filter_map(identity)
+        .min()
+        .unwrap()
+        .to_string()
+}
 pub fn advent12() -> String {
     use tree::Node;
 
@@ -239,9 +295,11 @@ pub fn advent12() -> String {
         }
     }
     let root = Rc::new(RefCell::new(Node::new(start, 'S'))); // use a here
-    let end_node = breath_first(root, &grid);
+    let end_node = breath_first(&root, &grid);
 
-    get_path_length(end_node).to_string()
+    let path = get_path(end_node.unwrap());
+    print_positions(&path);
+    (path.len() - 1).to_string() // -1 because the 'E' does not count towards the path length
 }
 
 #[cfg(test)]
@@ -258,8 +316,6 @@ mod tests {
         let root = Rc::new(RefCell::new(Node::new(Position { row: 0, col: 0 }, 'S')));
         let child = Rc::new(RefCell::new(Node::new(Position { row: 0, col: 0 }, 'T')));
         add_child(&root, &child);
-        print_node(root);
-        println!("Thing");
-        assert!(false);
+        assert!(true);
     }
 }
