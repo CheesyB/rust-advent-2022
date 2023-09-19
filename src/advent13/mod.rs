@@ -1,59 +1,11 @@
-use std::{
-    borrow::BorrowMut,
-    cell::{Ref, RefCell},
-    fmt,
-    rc::Rc,
-};
+use std::{cell::RefCell, fmt, ops::Deref, rc::Rc};
 
 use crate::helper;
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 enum Element {
     List(Vec<Rc<RefCell<Element>>>),
     Int(u8),
     EmptyList,
-}
-
-struct Iter<T> {
-    parent: T,
-    current: T,
-    current_index: Vec<usize>,
-}
-
-impl Iterator for Iter<Rc<RefCell<Element>>> {
-    type Item = Rc<RefCell<Element>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let tmp_current = self.current.clone();
-        match &*tmp_current.borrow() {
-            Element::List(list) => list
-                .get(*self.current_index.last().unwrap())
-                .map(|p| {
-                    match &*p.borrow() {
-                        Element::List(_) => {
-                            self.current_index.push(0);
-                        }
-                        Element::Int(_) => (),
-                        Element::EmptyList => (),
-                    }
-                    Some(p.clone())
-                })
-                .unwrap_or_else(|| {
-                    // we ran out of elements in the list
-                    self.current = self.parent;
-                    self.current_index.pop();
-                    Some(self.parent.clone())
-                }),
-            Element::EmptyList => {
-                self.current = self.parent;
-                self.current_index.pop();
-                Some(Rc::new(RefCell::new(Element::EmptyList)))
-            }
-            Element::Int(int) => {
-                *self.current_index.last().unwrap() += 1;
-                Some(self.current.clone())
-            }
-        }
-    }
 }
 
 impl fmt::Display for Element {
@@ -73,21 +25,89 @@ impl fmt::Display for Element {
     }
 }
 
-fn parse_packet<'a>(input: &'a str) -> Rc<RefCell<Element>> {
+impl PartialEq for Element {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::List(l0), Self::List(r0)) => l0 == r0,
+            (Self::Int(l0), Self::Int(r0)) => l0 == r0,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+}
+impl Eq for Element {}
+impl PartialOrd for Element {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        todo!()
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        matches!(self.partial_cmp(other), Some(core::cmp::Ordering::Less))
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        matches!(
+            self.partial_cmp(other),
+            Some(core::cmp::Ordering::Less | core::cmp::Ordering::Equal)
+        )
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        matches!(self.partial_cmp(other), Some(core::cmp::Ordering::Greater))
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        matches!(
+            self.partial_cmp(other),
+            Some(core::cmp::Ordering::Greater | core::cmp::Ordering::Equal)
+        )
+    }
+}
+
+impl Ord for Element {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self {
+            Element::List(ref list) => match other {
+                Element::List(ref other_list) => {
+                    list.first().unwrap().cmp(other_list.first().unwrap())
+                }
+                Element::Int(other_int) => list
+                Element::EmptyList => todo!(),
+            },
+            Element::Int(ref int) => match other {
+                Element::List(ref other_list) => todo!(),
+                Element::Int(ref other_int) => int.cmp(other_int),
+                Element::EmptyList => todo!(),
+            },
+            Element::EmptyList => todo!(),
+        }
+    }
+}
+
+fn parse_packet2<'a>(input: &'a str) -> (Rc<RefCell<Element>>, Vec<Rc<RefCell<Element>>>) {
+
+fn parse_packet<'a>(input: &'a str) -> (Rc<RefCell<Element>>, Vec<Rc<RefCell<Element>>>) {
     let mut peek = input.chars().peekable();
     let packet = Rc::new(RefCell::new(Element::List(vec![])));
     let mut parent_element = packet.clone();
     let mut current_element = packet.clone();
+    let mut indices = vec![packet.clone()];
     peek.next(); // magic next ignores first nesting:)
     while let Some(char) = peek.next() {
         match char {
             '[' => {
                 let nested = Rc::new(RefCell::new(Element::List(vec![])));
-                match &mut *parent_element.borrow_mut() {
+                match &mut *parent_element.deref().borrow_mut() {
                     Element::List(list) => {
                         if peek.peek().unwrap() == &']' {
-                            list.push(Rc::new(RefCell::new(Element::EmptyList)));
+                            let empty_list = Rc::new(RefCell::new(Element::EmptyList));
+                            indices.push(nested.clone());
+                            list.push(empty_list.clone());
                         } else {
+                            indices.push(nested.clone());
                             list.push(nested.clone());
                         }
                     }
@@ -113,51 +133,39 @@ fn parse_packet<'a>(input: &'a str) -> Rc<RefCell<Element>> {
                     }
                     let int = u8::from_str_radix(&digit, 10).unwrap();
                     let ele = Rc::new(RefCell::new(Element::Int(int)));
-                    match &mut *current_element.borrow_mut() {
+                    indices.push(ele.clone());
+                    match &mut *current_element.deref().borrow_mut() {
                         Element::List(list) => {
                             list.push(ele);
                         }
                         Element::Int(_) => panic!("some wrong parsing"),
+                        Element::EmptyList => panic!("some wrong parsing"),
                     }
                 }
             },
         }
     }
-    packet
+    (packet, indices)
 }
 
 //fn parse_unit<'a>ut: Rc<ROption<>}
-fn advent13() -> String {
+pub fn advent13() -> String {
     let content = helper::read_puzzle_input("./src/advent13/distress_test.txt");
     let mut packets = vec![];
+    let mut packets_iter = vec![];
     let mut raw = content.lines().peekable();
     while raw.peek().is_some() {
-        packets.push((
-            parse_packet(raw.next().unwrap()),
-            parse_packet(raw.next().unwrap()),
-        ));
+        let first = parse_packet(raw.next().unwrap());
+        let second = parse_packet(raw.next().unwrap());
+        packets.push((first.0, second.0));
+        packets_iter.push((first.1, second.1));
         raw.next(); // empty line
     }
     packets
         .iter()
         .for_each(|p| print!("{}\n{}\n\n", p.0.borrow(), p.1.borrow()));
 
-    let first_packet = Iter {
-        parent: packets[0].0.clone(),
-        current: packets[0].0.clone(),
-        current_index: vec![0],
-    };
-    let second_packet = Iter {
-        parent: packets[0].1.clone(),
-        current: packets[0].1.clone(),
-        current_index: vec![0],
-    };
-
-    print!("{}", &*packets[0].0.borrow());
-    for (i, ele) in first_packet.enumerate() {
-        print!("{}: {}", i, &*ele.borrow());
-    }
-
+    dbg!(&packets_iter[0]);
     "hallo".to_string()
 }
 
