@@ -164,13 +164,13 @@ mod tests {
         let result = start_compare_packets("[9]", "[[8,7,6]]");
         assert!(!result);
     }    }
-    #[    #[test]
-    fn    fn test_cmp4() {
+    #[test]
+    fn test_cmp4() {
               let result = start_compare_packets("[[4,4],4,4]", "[[4,4],4,4,4]");
               assert!(result);
-    }    }
-    #[    #[test]
-    fn    fn test_cmp5() {
+    }    
+    #[test]
+     fn test_cmp5() {
               let result = start_compare_packets("[7,7,7,7]", "[7,[6],7,7]");
               assert!(!result);
     }
