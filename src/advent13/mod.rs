@@ -1,172 +1,143 @@
-use std::{cell::RefCell, fmt, ops::Deref, rc::Rc};
+use std::vec;
 
 use crate::helper;
-#[derive(Debug)]
-enum Element {
-    List(Vec<Rc<RefCell<Element>>>),
-    Int(u8),
-    EmptyList,
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
+enum Element<'a> {
+    List(&'a str),
+    Val(u8),
 }
 
-impl fmt::Display for Element {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Element::List(list) => {
-                write!(f, "[")?;
-                for ele in list {
-                    ele.borrow().fmt(f)?;
-                }
-                write!(f, "]")?;
-                Ok(())
-            }
-            Element::Int(int) => write!(f, ",{}", int),
-            Element::EmptyList => write!(f, "EMPTY"),
-        }
-    }
-}
-
-impl PartialEq for Element {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::List(l0), Self::List(r0)) => l0 == r0,
-            (Self::Int(l0), Self::Int(r0)) => l0 == r0,
-            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
-        }
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
-    }
-}
-impl Eq for Element {}
-impl PartialOrd for Element {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        todo!()
-    }
-
-    fn lt(&self, other: &Self) -> bool {
-        matches!(self.partial_cmp(other), Some(core::cmp::Ordering::Less))
-    }
-
-    fn le(&self, other: &Self) -> bool {
-        matches!(
-            self.partial_cmp(other),
-            Some(core::cmp::Ordering::Less | core::cmp::Ordering::Equal)
-        )
-    }
-
-    fn gt(&self, other: &Self) -> bool {
-        matches!(self.partial_cmp(other), Some(core::cmp::Ordering::Greater))
-    }
-
-    fn ge(&self, other: &Self) -> bool {
-        matches!(
-            self.partial_cmp(other),
-            Some(core::cmp::Ordering::Greater | core::cmp::Ordering::Equal)
-        )
-    }
-}
-
-impl Ord for Element {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self {
-            Element::List(ref list) => match other {
-                Element::List(ref other_list) => {
-                    list.first().unwrap().cmp(other_list.first().unwrap())
-                }
-                Element::Int(other_int) => list
-                Element::EmptyList => todo!(),
-            },
-            Element::Int(ref int) => match other {
-                Element::List(ref other_list) => todo!(),
-                Element::Int(ref other_int) => int.cmp(other_int),
-                Element::EmptyList => todo!(),
-            },
-            Element::EmptyList => todo!(),
-        }
-    }
-}
-
-fn parse_packet2<'a>(input: &'a str) -> (Rc<RefCell<Element>>, Vec<Rc<RefCell<Element>>>) {
-
-fn parse_packet<'a>(input: &'a str) -> (Rc<RefCell<Element>>, Vec<Rc<RefCell<Element>>>) {
-    let mut peek = input.chars().peekable();
-    let packet = Rc::new(RefCell::new(Element::List(vec![])));
-    let mut parent_element = packet.clone();
-    let mut current_element = packet.clone();
-    let mut indices = vec![packet.clone()];
-    peek.next(); // magic next ignores first nesting:)
-    while let Some(char) = peek.next() {
-        match char {
+fn parse_level<'a>(input: &'a str) -> Vec<Element> {
+    let mut char_peek = input.char_indices().peekable();
+    let mut level: usize = 0;
+    let mut nested_range_start: Option<usize> = None;
+    let mut items = vec![];
+    while let Some((pos, ch)) = char_peek.next() {
+        match ch {
             '[' => {
-                let nested = Rc::new(RefCell::new(Element::List(vec![])));
-                match &mut *parent_element.deref().borrow_mut() {
-                    Element::List(list) => {
-                        if peek.peek().unwrap() == &']' {
-                            let empty_list = Rc::new(RefCell::new(Element::EmptyList));
-                            indices.push(nested.clone());
-                            list.push(empty_list.clone());
-                        } else {
-                            indices.push(nested.clone());
-                            list.push(nested.clone());
-                        }
-                    }
-                    Element::Int(_) => panic!("some wrong parsing"),
-                    Element::EmptyList => panic!("some wrong parsing"),
+                if level == 1 {
+                    nested_range_start = Some(pos);
                 }
-                parent_element = current_element;
-                current_element = nested
+                level += 1;
             }
-            ']' => current_element = parent_element.clone(),
-            val => match val {
-                ',' => (),
-                ' ' => (),
-                other => {
+            ']' => {
+                level -= 1;
+                if level == 1 {
+                    items.push(Element::List(&input[nested_range_start.unwrap()..=pos]));
+                }
+            }
+            ',' => (),
+            ' ' => (),
+            other => {
+                if level == 1 {
                     let mut digit = other.to_string();
                     // if number is 10
-                    if peek.peek().unwrap().to_digit(10).is_some() {
-                        let next_digit =
-                            char::from_digit(peek.peek().unwrap().to_digit(10).unwrap(), 10)
-                                .unwrap();
+                    if let Some(digi) = char_peek.peek().clone().unwrap().1.to_digit(10) {
+                        let next_digit = char::from_digit(digi, 10).unwrap();
                         digit.push(next_digit);
-                        peek.next();
+                        char_peek.next(); //don't loop
                     }
                     let int = u8::from_str_radix(&digit, 10).unwrap();
-                    let ele = Rc::new(RefCell::new(Element::Int(int)));
-                    indices.push(ele.clone());
-                    match &mut *current_element.deref().borrow_mut() {
-                        Element::List(list) => {
-                            list.push(ele);
-                        }
-                        Element::Int(_) => panic!("some wrong parsing"),
-                        Element::EmptyList => panic!("some wrong parsing"),
-                    }
+                    items.push(Element::Val(int))
                 }
-            },
+            }
         }
     }
-    (packet, indices)
+    items
 }
 
-//fn parse_unit<'a>ut: Rc<ROption<>}
+fn start_compare_packets(left: &str, right: &str) -> bool {
+    if let Some(res) = compare_packets(left, right) {
+        return res;
+    } else {
+        return false;
+    }
+}
+
+fn compare_packets(left: &str, right: &str) -> Option<bool> {
+    let left_eles = parse_level(left);
+    if left_eles.is_empty() {
+        println!(" => true (Left RAN OUT FIRST)");
+        return Some(true);
+    }
+    let right_eles = parse_level(right);
+    let mut left_iter = left_eles.iter();
+    let mut right_iter = right_eles.iter();
+    while let Some(left_ele) = left_iter.next() {
+        if let Some(right_ele) = right_iter.next() {
+            match left_ele {
+                Element::List(l_list) => match right_ele {
+                    Element::List(r_list) => {
+                        println!(" LIST:{} <> LIST:{}", l_list, r_list);
+                        if let Some(cmp) = compare_packets(l_list, r_list) {
+                            return Some(cmp);
+                        }
+                        continue;
+                    }
+                    Element::Val(r_int) => {
+                        println!(" LIST:{} <> INT:{}", l_list, r_int);
+
+                        if let Some(cmp) = compare_packets(l_list, &format!("[{r_int}]")) {
+                            return Some(cmp);
+                        }
+                        continue;
+                    }
+                },
+                Element::Val(l_int) => match right_ele {
+                    Element::List(r_list) => {
+                        println!(" INT:{} <> LIST:{}", l_int, r_list);
+                        if let Some(cmp) = compare_packets(&format!("[{l_int}]"), r_list) {
+                            return Some(cmp);
+                        }
+                        continue;
+                    }
+                    Element::Val(r_int) => {
+                        if l_int == r_int {
+                            println!(" INT:{} == INT:{}", l_int, r_int);
+                            continue;
+                        } else {
+                            println!(" INT:{} < INT:{} => {}", l_int, r_int, l_int < r_int);
+                            return Some(l_int < r_int);
+                        }
+                    }
+                },
+            }
+        } else {
+            //ran out of right values
+            print!(" =>  false (RIGHT RAN OUT)\n");
+            return Some(false);
+        }
+    }
+    None
+}
+
 pub fn advent13() -> String {
-    let content = helper::read_puzzle_input("./src/advent13/distress_test.txt");
-    let mut packets = vec![];
-    let mut packets_iter = vec![];
+    let content = helper::read_puzzle_input("./src/advent13/distress.txt");
+    let mut packets_left = vec![];
+    let mut packets_right = vec![];
     let mut raw = content.lines().peekable();
     while raw.peek().is_some() {
-        let first = parse_packet(raw.next().unwrap());
-        let second = parse_packet(raw.next().unwrap());
-        packets.push((first.0, second.0));
-        packets_iter.push((first.1, second.1));
+        packets_left.push(raw.next().unwrap());
+        packets_right.push(raw.next().unwrap());
         raw.next(); // empty line
     }
-    packets
-        .iter()
-        .for_each(|p| print!("{}\n{}\n\n", p.0.borrow(), p.1.borrow()));
+    let packets: Vec<_> = packets_left.iter().zip(packets_right.iter()).collect();
 
-    dbg!(&packets_iter[0]);
-    "hallo".to_string()
+    let mut summary = vec![];
+    for (l, r) in packets {
+        let val = start_compare_packets(l, r);
+        println!();
+        summary.push(val);
+    }
+    summary
+        .iter()
+        .enumerate()
+        .fold(
+            0,
+            |acc: usize, (index, val)| if *val { acc + index + 1 } else { acc },
+        )
+        .to_string()
 }
 
 pub fn advent13_2() -> String {
@@ -176,21 +147,87 @@ pub fn advent13_2() -> String {
 #[cfg(test)]
 mod tests {
 
-    use crate::advent13::Element;
-
-    //#[test]
-    fn test1() {
-        let input = "[[4,4],4,4]".to_string();
-        let splitty: Vec<&str> = input.split('[').collect();
-        dbg!(splitty);
-        assert!(false);
-    }
+    use super::*;
 
     #[test]
-    fn test2() {
-        let input = "[[]1,11,[4,4],4,4]".to_string();
+    fn test_cmp1() {
+        let result = start_compare_packets("[1,1,3,1,1]", "[1,1,5,1,1]");
+        assert!(result);
+    }
+    #[test]
+    fn test_cmp2() {
+        let result = start_compare_packets("[[1],[2,3,4]]", "[[1],4]");
+        assert!(result);
+    }
+    #[test]
+    fn test_cmp3() {
+        let result = start_compare_packets("[9]", "[[8,7,6]]");
+        assert!(!result);
+    }    }
+    #[    #[test]
+    fn    fn test_cmp4() {
+              let result = start_compare_packets("[[4,4],4,4]", "[[4,4],4,4,4]");
+              assert!(result);
+    }    }
+    #[    #[test]
+    fn    fn test_cmp5() {
+              let result = start_compare_packets("[7,7,7,7]", "[7,[6],7,7]");
+              assert!(!result);
+    }
+    #[test]
+    fn test_cmp6() {
+        let result = start_compare_packets("[]", "[3]");
+        assert!(result);
+    }
+    #[test]
+    fn test_cmp7() {
+        let result = start_compare_packets("[[[]]]", "[[]]");
+        assert!(!result);
+    }
+    #[test]
+    fn test_cmp8() {
+        let result =
+            start_compare_packets("[1,[2,[3,[4,[5,6,7]]]],8,9]", "[1,[2,[3,[4,[5,6,0]]]],8,9]");
+        assert!(!result);
+    }
+    #[test]
+    fn test_cmp9() {
+        let result = start_compare_packets(
+            "[[2,8]]",
+            "[[[[2],[9,9,6],[1,8],[5,4,6,0,2]],[[5,9],[]],[7,[4,2,3,4],6]],[],[1,9,7,[6]]]",
+        );
+        assert!(result);
+    }
+    #[test]
+    fn test_cmp10() {
+        let result = start_compare_packets(
+            "[[],[[1,[6,2,10]]],[],[[[7,9,2,8],[5,1,2],9],3,[10]]]",
+            "[[[2]],[10,[10,6,8],8,[8,0,10,2],10]]",
+        );
+        assert!(result);
+    }
+        
 
-        //dbg!(packet);
-        assert!(false)
+    #[test]
+    fn test_double_nesting() {
+        let result = parse_level("[[4,[5,5],4],4,4]");
+        dbg!(&result);
+        assert_eq!(
+            result,
+            vec![
+                Element::List("[4,[5,5],4]"),
+                Element::Val(4),
+                Element::Val(4)
+            ]
+        );
+    }
+    #[test]
+    fn test_nesting() {
+        let result = parse_level("[[4,4],4,4]");
+        dbg!(&result);
+        assert_eq!(
+            result,
+            vec![Element::List("[4,4]"), Element::Val(4), Element::Val(4)]
+        );
     }
 }
