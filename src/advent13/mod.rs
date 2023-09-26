@@ -1,4 +1,4 @@
-use std::vec;
+use std::{cmp::Ordering, fmt::format, vec};
 
 use crate::helper;
 
@@ -47,19 +47,11 @@ fn parse_level<'a>(input: &'a str) -> Vec<Element> {
     items
 }
 
-fn start_compare_packets(left: &str, right: &str) -> bool {
-    if let Some(res) = compare_packets(left, right) {
-        return res;
-    } else {
-        return false;
-    }
-}
-
-fn compare_packets(left: &str, right: &str) -> Option<bool> {
+fn compare_packets(left: &str, right: &str) -> Ordering {
     let left_eles = parse_level(left);
     if left_eles.is_empty() {
         println!(" => true (Left RAN OUT FIRST)");
-        return Some(true);
+        return Ordering::Less;
     }
     let right_eles = parse_level(right);
     let mut left_iter = left_eles.iter();
@@ -70,35 +62,39 @@ fn compare_packets(left: &str, right: &str) -> Option<bool> {
                 Element::List(l_list) => match right_ele {
                     Element::List(r_list) => {
                         println!(" LIST:{} <> LIST:{}", l_list, r_list);
-                        if let Some(cmp) = compare_packets(l_list, r_list) {
-                            return Some(cmp);
+                        match compare_packets(l_list, r_list) {
+                            Ordering::Less => return Ordering::Less,
+                            Ordering::Greater => return Ordering::Greater,
+                            Ordering::Equal => continue,
                         }
-                        continue;
                     }
                     Element::Val(r_int) => {
                         println!(" LIST:{} <> INT:{}", l_list, r_int);
-
-                        if let Some(cmp) = compare_packets(l_list, &format!("[{r_int}]")) {
-                            return Some(cmp);
+                        match compare_packets(l_list, &format!("[{r_int}]")) {
+                            Ordering::Less => return Ordering::Less,
+                            Ordering::Greater => return Ordering::Greater,
+                            Ordering::Equal => continue,
                         }
-                        continue;
                     }
                 },
                 Element::Val(l_int) => match right_ele {
                     Element::List(r_list) => {
                         println!(" INT:{} <> LIST:{}", l_int, r_list);
-                        if let Some(cmp) = compare_packets(&format!("[{l_int}]"), r_list) {
-                            return Some(cmp);
+                        match compare_packets(&format!("[{l_int}]"), r_list) {
+                            Ordering::Less => return Ordering::Less,
+                            Ordering::Greater => return Ordering::Greater,
+                            Ordering::Equal => continue,
                         }
-                        continue;
                     }
                     Element::Val(r_int) => {
                         if l_int == r_int {
                             println!(" INT:{} == INT:{}", l_int, r_int);
                             continue;
-                        } else {
+                        } else if l_int < r_int {
                             println!(" INT:{} < INT:{} => {}", l_int, r_int, l_int < r_int);
-                            return Some(l_int < r_int);
+                            return Ordering::Less;
+                        } else {
+                            return Ordering::Greater;
                         }
                     }
                 },
@@ -106,10 +102,14 @@ fn compare_packets(left: &str, right: &str) -> Option<bool> {
         } else {
             //ran out of right values
             print!(" =>  false (RIGHT RAN OUT)\n");
-            return Some(false);
+            return Ordering::Greater;
         }
     }
-    None
+    if right_iter.next().is_none() {
+        return Ordering::Equal;
+    } else {
+        return Ordering::Less;
+    }
 }
 
 pub fn advent13() -> String {
@@ -126,22 +126,46 @@ pub fn advent13() -> String {
 
     let mut summary = vec![];
     for (l, r) in packets {
-        let val = start_compare_packets(l, r);
+        let val = compare_packets(l, r);
         println!();
         summary.push(val);
     }
     summary
         .iter()
         .enumerate()
-        .fold(
-            0,
-            |acc: usize, (index, val)| if *val { acc + index + 1 } else { acc },
-        )
+        .fold(0, |acc: usize, (index, val)| match val {
+            Ordering::Less => acc + index + 1,
+            Ordering::Greater => acc,
+            Ordering::Equal => acc,
+        })
         .to_string()
 }
 
 pub fn advent13_2() -> String {
-    "hallo2".to_string()
+    let content = helper::read_puzzle_input("./src/advent13/distress.txt");
+    let divider_packet_one = "[[2]]";
+    let divider_packet_two = "[[6]]";
+    let mut packets = vec![];
+    packets.push(divider_packet_one);
+    packets.push(divider_packet_two);
+    for line in content.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        packets.push(line);
+    }
+    packets.sort_by(|l, r| compare_packets(l, r));
+    let index_one = packets
+        .iter()
+        .position(|div| *div == divider_packet_one)
+        .unwrap()
+        + 1;
+    let index_two = packets
+        .iter()
+        .position(|div| *div == divider_packet_two)
+        .unwrap()
+        + 1;
+    (index_one * index_two).to_string()
 }
 
 #[cfg(test)]
@@ -151,62 +175,61 @@ mod tests {
 
     #[test]
     fn test_cmp1() {
-        let result = start_compare_packets("[1,1,3,1,1]", "[1,1,5,1,1]");
-        assert!(result);
+        let result = compare_packets("[1,1,3,1,1]", "[1,1,5,1,1]");
+        assert!(result == Ordering::Less);
     }
     #[test]
     fn test_cmp2() {
-        let result = start_compare_packets("[[1],[2,3,4]]", "[[1],4]");
-        assert!(result);
+        let result = compare_packets("[[1],[2,3,4]]", "[[1],4]");
+        assert!(result == Ordering::Less);
     }
     #[test]
     fn test_cmp3() {
-        let result = start_compare_packets("[9]", "[[8,7,6]]");
-        assert!(!result);
-    }    }
+        let result = compare_packets("[9]", "[[8,7,6]]");
+        assert!(result == Ordering::Greater);
+    }
     #[test]
     fn test_cmp4() {
-              let result = start_compare_packets("[[4,4],4,4]", "[[4,4],4,4,4]");
-              assert!(result);
-    }    
+        let result = compare_packets("[[4,4],4,4]", "[[4,4],4,4,4]");
+        assert!(result == Ordering::Less);
+    }
     #[test]
-     fn test_cmp5() {
-              let result = start_compare_packets("[7,7,7,7]", "[7,[6],7,7]");
-              assert!(!result);
+    fn test_cmp5() {
+        let result = compare_packets("[7,7,7,7]", "[7,[6],7,7]");
+        assert!(result == Ordering::Greater);
     }
     #[test]
     fn test_cmp6() {
-        let result = start_compare_packets("[]", "[3]");
-        assert!(result);
+        let result = compare_packets("[]", "[3]");
+        assert!(result == Ordering::Less);
     }
     #[test]
     fn test_cmp7() {
-        let result = start_compare_packets("[[[]]]", "[[]]");
-        assert!(!result);
+        let result = compare_packets("[[[]]]", "[[]]");
+        assert!(result == Ordering::Greater);
     }
     #[test]
     fn test_cmp8() {
-        let result =
-            start_compare_packets("[1,[2,[3,[4,[5,6,7]]]],8,9]", "[1,[2,[3,[4,[5,6,0]]]],8,9]");
-        assert!(!result);
+        let result = compare_packets("[1,[2,[3,[4,[5,6,7]]]],8,9]", "[1,[2,[3,[4,[5,6,0]]]],8,9]");
+        assert!(result == Ordering::Greater);
     }
     #[test]
     fn test_cmp9() {
-        let result = start_compare_packets(
+        let result = compare_packets(
             "[[2,8]]",
             "[[[[2],[9,9,6],[1,8],[5,4,6,0,2]],[[5,9],[]],[7,[4,2,3,4],6]],[],[1,9,7,[6]]]",
         );
-        assert!(result);
+        assert!(result == Ordering::Less);
     }
     #[test]
     fn test_cmp10() {
-        let result = start_compare_packets(
+        let result = compare_packets(
             "[[],[[1,[6,2,10]]],[],[[[7,9,2,8],[5,1,2],9],3,[10]]]",
             "[[[2]],[10,[10,6,8],8,[8,0,10,2],10]]",
         );
-        assert!(result);
+
+        assert!(result == Ordering::Less);
     }
-        
 
     #[test]
     fn test_double_nesting() {
