@@ -50,7 +50,7 @@ fn parse_level<'a>(input: &'a str) -> Vec<Element> {
 fn compare_packets(left: &str, right: &str) -> Ordering {
     let left_eles = parse_level(left);
     if left_eles.is_empty() {
-        println!(" => true (Left RAN OUT FIRST)");
+        //println!(" => true (Left RAN OUT FIRST)");
         return Ordering::Less;
     }
     let right_eles = parse_level(right);
@@ -61,7 +61,7 @@ fn compare_packets(left: &str, right: &str) -> Ordering {
             match left_ele {
                 Element::List(l_list) => match right_ele {
                     Element::List(r_list) => {
-                        println!(" LIST:{} <> LIST:{}", l_list, r_list);
+                        //println!(" LIST:{} <> LIST:{}", l_list, r_list);
                         match compare_packets(l_list, r_list) {
                             Ordering::Less => return Ordering::Less,
                             Ordering::Greater => return Ordering::Greater,
@@ -69,7 +69,7 @@ fn compare_packets(left: &str, right: &str) -> Ordering {
                         }
                     }
                     Element::Val(r_int) => {
-                        println!(" LIST:{} <> INT:{}", l_list, r_int);
+                        //println!(" LIST:{} <> INT:{}", l_list, r_int);
                         match compare_packets(l_list, &format!("[{r_int}]")) {
                             Ordering::Less => return Ordering::Less,
                             Ordering::Greater => return Ordering::Greater,
@@ -79,7 +79,7 @@ fn compare_packets(left: &str, right: &str) -> Ordering {
                 },
                 Element::Val(l_int) => match right_ele {
                     Element::List(r_list) => {
-                        println!(" INT:{} <> LIST:{}", l_int, r_list);
+                        //println!(" INT:{} <> LIST:{}", l_int, r_list);
                         match compare_packets(&format!("[{l_int}]"), r_list) {
                             Ordering::Less => return Ordering::Less,
                             Ordering::Greater => return Ordering::Greater,
@@ -88,10 +88,10 @@ fn compare_packets(left: &str, right: &str) -> Ordering {
                     }
                     Element::Val(r_int) => {
                         if l_int == r_int {
-                            println!(" INT:{} == INT:{}", l_int, r_int);
+                            //println!(" INT:{} == INT:{}", l_int, r_int);
                             continue;
                         } else if l_int < r_int {
-                            println!(" INT:{} < INT:{} => {}", l_int, r_int, l_int < r_int);
+                            //println!(" INT:{} < INT:{} => {}", l_int, r_int, l_int < r_int);
                             return Ordering::Less;
                         } else {
                             return Ordering::Greater;
@@ -101,7 +101,7 @@ fn compare_packets(left: &str, right: &str) -> Ordering {
             }
         } else {
             //ran out of right values
-            print!(" =>  false (RIGHT RAN OUT)\n");
+            //print!(" =>  false (RIGHT RAN OUT)\n");
             return Ordering::Greater;
         }
     }
@@ -127,7 +127,7 @@ pub fn advent13() -> String {
     let mut summary = vec![];
     for (l, r) in packets {
         let val = compare_packets(l, r);
-        println!();
+        //println!();
         summary.push(val);
     }
     summary

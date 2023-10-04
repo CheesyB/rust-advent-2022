@@ -1,12 +1,15 @@
 mod domain;
 
+use std::fs;
+
 use crate::advent14::domain::*;
 use crate::helper;
 
 pub fn advent14() -> String {
-    let content = helper::read_puzzle_input("./src/advent14/rocks.txt");
+    let content = helper::read_puzzle_input("./src/advent14/rocks_test.txt");
+    let map = Map::new(&content);
+    fs::write("src/advent14/render.txt", map.to_string()).expect("things to just work");
 
-    let thing = Map::new("halloe");
     "not implemented".into()
 }
 pub fn advent14_2() -> String {
