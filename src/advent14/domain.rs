@@ -32,15 +32,20 @@ pub type Grid = Vec<Vec<Fill>>;
 #[derive(Debug, Clone)]
 pub struct Map {
     grid: Grid,
+    min_x: usize,
+    min_y: usize,
+    max_x: usize,
+    max_y: usize,
 }
 
-struct Coord(usize, usize);
+#[derive(Debug, Clone, PartialEq)]
+pub struct Coord(usize, usize);
 
 impl Display for Map {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for row in self.grid.iter() {
-            for col in row {
-                write!(f, "{} ", col)?;
+        for col in self.grid.iter() {
+            for row in col {
+                write!(f, "{}", row)?;
             }
             writeln!(f)?;
         }
@@ -50,42 +55,54 @@ impl Display for Map {
 
 impl Map {
     pub fn new(input: &str) -> Map {
-        let mut map: Map = Map {
-            grid: vec![vec![Fill::Air; 600]; 600],
-        };
         let mut coords: Vec<Coord> = vec![];
         for line in input.lines() {
-            let mut tmp = Self::rock_coords(Self::parse_rocks(line));
-            coords.append(&mut tmp);
+            coords.append(&mut Self::rock_coords(Self::parse_rocks(line)));
         }
+
+        let min_x = coords.iter().map(|c| c.0).min().unwrap();
+        let min_y = coords.iter().map(|c| c.1).min().unwrap();
+        let max_x = coords.iter().map(|c| c.0).max().unwrap();
+        let max_y = coords.iter().map(|c| c.1).max().unwrap();
+
+        let mut map: Map = Map {
+            grid: vec![vec![Fill::Air; max_x - min_x + 1]; max_y - min_y + 1],
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+        };
         for coord in coords {
-            map.grid[coord.0][coord.1] = Fill::Rock;
+            map.grid[coord.1 - min_y][coord.0 - min_x] = Fill::Rock;
         }
         map
     }
 
-    fn rock_coords(rock_edges: Vec<Coord>) -> Vec<Coord> {
+    pub fn rock_coords(rock_edges: Vec<Coord>) -> Vec<Coord> {
         let mut rocks = vec![];
         for edge in rock_edges.windows(2) {
-            let mut tmp = &mut Self::expand_edges_to_line(&edge[0], &edge[1]);
-            rocks.append(&mut tmp);
+            rocks.append(&mut Self::expand_edges_to_line(&edge[0], &edge[1]));
         }
         rocks
     }
 
-    fn expand_edges_to_line(first_edge: &Coord, second_edge: &Coord) -> Vec<Coord> {
-        let delta_0 = first_edge.0..second_edge.0;
-        let delta_1 = first_edge.1..second_edge.1;
+    pub fn expand_edges_to_line(first_edge: &Coord, second_edge: &Coord) -> Vec<Coord> {
         let mut line = vec![];
-        for x in delta_0.clone() {
-            for y in delta_1.clone() {
+
+        let x_min = first_edge.0.min(second_edge.0);
+        let x_max = first_edge.0.max(second_edge.0);
+        let y_min = first_edge.1.min(second_edge.1);
+        let y_max = first_edge.1.max(second_edge.1);
+
+        for x in x_min..=x_max {
+            for y in y_min..=y_max {
                 line.push(Coord(x, y));
             }
         }
         line
     }
 
-    fn parse_rocks(line: &str) -> Vec<Coord> {
+    pub fn parse_rocks(line: &str) -> Vec<Coord> {
         let raw = separated_list1(
             tag(" -> "),
             separated_pair(u32::<&str, (&str, ErrorKind)>, char(','), u32),
@@ -100,7 +117,74 @@ impl Map {
             .ok()
             .unwrap();
 
-        print!("here");
         coords
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_map_expand_edges_to_line_rev() {
+        let result = Map::expand_edges_to_line(&Coord(10, 6), &Coord(5, 6));
+        let expected = vec![
+            Coord(5, 6),
+            Coord(6, 6),
+            Coord(7, 6),
+            Coord(8, 6),
+            Coord(9, 6),
+            Coord(10, 6),
+            Coord(11, 6),
+        ];
+        expected
+            .iter()
+            .zip(result.iter())
+            .for_each(|(a, b)| assert_eq!(a, b));
+    }
+    #[test]
+    fn test_map_expand_edges_to_line() {
+        let result = Map::expand_edges_to_line(&Coord(5, 6), &Coord(10, 6));
+        let expected = vec![
+            Coord(5, 6),
+            Coord(6, 6),
+            Coord(7, 6),
+            Coord(8, 6),
+            Coord(9, 6),
+            Coord(10, 6),
+            Coord(12, 6),
+        ];
+        expected
+            .iter()
+            .zip(result.iter().fuse())
+            .for_each(|(a, b)| assert_eq!(a, b));
+    }
+
+    #[test]
+    fn test_cmp1() {
+        let result = Map::parse_rocks("498,4 -> 498,6 -> 496,6");
+        let expected = vec![Coord(498, 4), Coord(498, 6), Coord(496, 6)];
+        result
+            .iter()
+            .zip(expected.iter())
+            .for_each(|(a, b)| assert_eq!(a, b));
+    }
+
+    #[test]
+    fn test_rocks_coords() {
+        let input = vec![Coord(498, 4), Coord(498, 6), Coord(496, 6)];
+        let result = Map::rock_coords(input);
+        let expected = vec![
+            Coord(498, 4),
+            Coord(498, 5),
+            Coord(498, 6),
+            Coord(497, 6),
+            Coord(496, 6),
+        ];
+        result
+            .iter()
+            .zip(expected.iter())
+            .for_each(|(a, b)| assert_eq!(a, b));
     }
 }
