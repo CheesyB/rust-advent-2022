@@ -7,7 +7,9 @@ use crate::helper;
 
 pub fn advent14() -> String {
     let content = helper::read_puzzle_input("./src/advent14/rocks_test.txt");
-    let map = Map::new(&content);
+    let mut map = Map::new(&content);
+    simulate(&mut map, &START_POSITION);
+
     fs::write("src/advent14/render.txt", map.to_string()).expect("things to just work");
 
     "not implemented".into()

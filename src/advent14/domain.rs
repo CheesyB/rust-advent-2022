@@ -8,7 +8,9 @@ use nom::error::ErrorKind;
 use nom::multi::separated_list1;
 use nom::sequence::separated_pair;
 
-#[derive(Debug, Clone)]
+pub const START_POSITION: Coord = Coord(500, 0);
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Fill {
     Air,
     Rock,
@@ -41,6 +43,22 @@ pub struct Map {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Coord(usize, usize);
 
+enum Moves {
+    DOWN,
+    LEFT,
+    RIGHT,
+}
+
+impl Coord {
+    fn move_to(&self, mov: Moves) -> Option<Coord> {
+        match mov {
+            Moves::DOWN => Some(Coord(self.0.checked_sub(1)?, self.1.checked_sub(1)?)),
+            Moves::LEFT => Some(Coord(self.0.checked_sub(1)?, self.1.checked_sub(1)?)),
+            Moves::RIGHT => Some(Coord(self.0.checked_sub(1)?, self.1 + 1)),
+        }
+    }
+}
+
 impl Display for Map {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for col in self.grid.iter() {
@@ -51,6 +69,39 @@ impl Display for Map {
         }
         Ok(())
     }
+}
+
+pub fn simulate(map: &mut Map, start_position: &Coord) {
+    for _ in 0..30 {
+        simulate_sand_corn(map, start_position.clone());
+    }
+}
+
+fn simulate_sand_corn(map: &mut Map, start_position: Coord) {
+    let next_position = start_position.clone();
+    let mut previouse_position = start_position.clone();
+    loop {
+        if let Some(next_position) = sand_fall_next(map, next_position.clone()) {
+            previouse_position = next_position;
+            continue;
+            //todo!("check if sand falls into the abbys");
+        }
+        break;
+    }
+    map.fill_at(previouse_position.clone(), Fill::RestedSand);
+}
+
+fn sand_fall_next(map: &Map, sand_position: Coord) -> Option<Coord> {
+    if map.get_fill_at(sand_position.move_to(Moves::DOWN)?) == Fill::Air {
+        return sand_position.move_to(Moves::DOWN);
+    }
+    if map.get_fill_at(sand_position.move_to(Moves::LEFT)?) == Fill::Air {
+        return sand_position.move_to(Moves::LEFT);
+    }
+    if map.get_fill_at(sand_position.move_to(Moves::RIGHT)?) == Fill::Air {
+        return sand_position.move_to(Moves::DOWN);
+    }
+    None
 }
 
 impl Map {
@@ -66,7 +117,7 @@ impl Map {
         let max_y = coords.iter().map(|c| c.1).max().unwrap();
 
         let mut map: Map = Map {
-            grid: vec![vec![Fill::Air; max_x - min_x + 1]; max_y - min_y + 1],
+            grid: vec![vec![Fill::Air; max_x - min_x + 11]; max_y - min_y + 11],
             min_x,
             min_y,
             max_x,
@@ -118,6 +169,22 @@ impl Map {
             .unwrap();
 
         coords
+    }
+
+    pub fn get_fill_at(&self, pos: Coord) -> Fill {
+        println!(
+            "actual {:?}, norm {} - {}, {} - {}",
+            pos, pos.0, self.min_x, pos.1, self.min_y
+        );
+        self.grid[pos.0 - self.min_x][pos.1]
+    }
+
+    pub fn fill_at(&mut self, pos: Coord, fill: Fill) {
+        println!(
+            "actual {:?}, norm {} - {}, {} - {}",
+            pos, pos.0, self.min_x, pos.1, self.min_y
+        );
+        self.grid[pos.0 - self.min_x][pos.1] = fill;
     }
 }
 
