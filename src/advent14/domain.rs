@@ -14,7 +14,6 @@ pub const START_POSITION: Coord = Coord(500, 0);
 pub enum Fill {
     Air,
     Rock,
-    FallingSand,
     RestedSand,
 }
 
@@ -23,8 +22,7 @@ impl Display for Fill {
         match self {
             Fill::Air => write!(f, "."),
             Fill::Rock => write!(f, "#"),
-            Fill::FallingSand => write!(f, "ⵔ"),
-            Fill::RestedSand => write!(f, "ⵙ"),
+            Fill::RestedSand => write!(f, "X"),
         }
     }
 }
@@ -35,12 +33,10 @@ pub type Grid = Vec<Vec<Fill>>;
 pub struct Map {
     grid: Grid,
     min_x: usize,
-    min_y: usize,
-    max_x: usize,
     max_y: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Coord(usize, usize);
 
 enum Moves {
@@ -52,9 +48,9 @@ enum Moves {
 impl Coord {
     fn move_to(&self, mov: Moves) -> Option<Coord> {
         match mov {
-            Moves::DOWN => Some(Coord(self.0.checked_sub(1)?, self.1.checked_sub(1)?)),
-            Moves::LEFT => Some(Coord(self.0.checked_sub(1)?, self.1.checked_sub(1)?)),
-            Moves::RIGHT => Some(Coord(self.0.checked_sub(1)?, self.1 + 1)),
+            Moves::DOWN => Some(Coord(self.0, self.1 + 1)),
+            Moves::LEFT => Some(Coord(self.0 - 1, self.1 + 1)),
+            Moves::RIGHT => Some(Coord(self.0 + 1, self.1 + 1)),
         }
     }
 }
@@ -71,40 +67,79 @@ impl Display for Map {
     }
 }
 
-pub fn simulate(map: &mut Map, start_position: &Coord) {
-    for _ in 0..30 {
-        simulate_sand_corn(map, start_position.clone());
-    }
-}
-
-fn simulate_sand_corn(map: &mut Map, start_position: Coord) {
-    let next_position = start_position.clone();
+fn simulate_sand_corn_until_full(map: &mut Map, start_position: Coord) -> bool {
+    let mut next_position = start_position.clone();
     let mut previouse_position = start_position.clone();
     loop {
-        if let Some(next_position) = sand_fall_next(map, next_position.clone()) {
-            previouse_position = next_position;
+        previouse_position = next_position.clone();
+        if let Some(new_position) = sand_fall_next(map, next_position.clone()) {
+            next_position = new_position.clone();
             continue;
-            //todo!("check if sand falls into the abbys");
         }
         break;
     }
     map.fill_at(previouse_position.clone(), Fill::RestedSand);
+    if previouse_position == Coord(500,0) {
+        return false;
+    } else {
+        return true;
+    }
+}
+pub fn simulate_unitl_full(map: &mut Map, start_position: &Coord) -> i32 {
+    let mut count = 1;
+    while simulate_sand_corn_until_full(map, start_position.clone()) {
+        count += 1;
+    }
+    count
+}
+pub fn simulate_void(map: &mut Map, start_position: &Coord) -> i32 {
+    let mut count = 0;
+    while simulate_sand_corn_void(map, start_position.clone()) {
+        count += 1;
+    }
+    count
+}
+
+fn simulate_sand_corn_void(map: &mut Map, start_position: Coord) -> bool {
+    let mut next_position = start_position.clone();
+    let mut previouse_position = start_position.clone();
+    loop {
+        previouse_position = next_position.clone();
+        if let Some(new_position) = sand_fall_next(map, next_position.clone()) {
+            next_position = new_position.clone();
+            //falls into the void 
+            if new_position.1 > map.max_y {
+                return false;
+            }
+            continue;
+        }
+        break;
+    }
+    map.fill_at(previouse_position.clone(), Fill::RestedSand);
+    true
 }
 
 fn sand_fall_next(map: &Map, sand_position: Coord) -> Option<Coord> {
-    if map.get_fill_at(sand_position.move_to(Moves::DOWN)?) == Fill::Air {
-        return sand_position.move_to(Moves::DOWN);
+    let sand_pos = [
+        sand_position.move_to(Moves::DOWN)?,
+        sand_position.move_to(Moves::LEFT)?,
+        sand_position.move_to(Moves::RIGHT)?,
+    ];
+    if map.get_fill_at(&sand_pos[0]) == Fill::Air {
+        return Some(sand_pos[0]);
     }
-    if map.get_fill_at(sand_position.move_to(Moves::LEFT)?) == Fill::Air {
-        return sand_position.move_to(Moves::LEFT);
+    if map.get_fill_at(&sand_pos[1]) == Fill::Air {
+        return Some(sand_pos[1]);
     }
-    if map.get_fill_at(sand_position.move_to(Moves::RIGHT)?) == Fill::Air {
-        return sand_position.move_to(Moves::DOWN);
+    if map.get_fill_at(&sand_pos[2]) == Fill::Air {
+        return Some(sand_pos[2]);
     }
     None
 }
 
 impl Map {
+    const PADDING: usize = 200;
+
     pub fn new(input: &str) -> Map {
         let mut coords: Vec<Coord> = vec![];
         for line in input.lines() {
@@ -116,16 +151,25 @@ impl Map {
         let max_x = coords.iter().map(|c| c.0).max().unwrap();
         let max_y = coords.iter().map(|c| c.1).max().unwrap();
 
+        coords.append(&mut Self::rock_coords(vec![
+            Coord(min_x - Self::PADDING + 5,  max_y + 2),
+            Coord(max_x + Self::PADDING -5 ,  max_y + 2),
+        ]));
+
         let mut map: Map = Map {
-            grid: vec![vec![Fill::Air; max_x - min_x + 11]; max_y - min_y + 11],
+            grid: vec![
+                vec![Fill::Air; Self::PADDING + max_x - min_x + Self::PADDING ]; // 100 due to bug somewhere
+                Self::PADDING + max_y - min_y 
+            ],
             min_x,
             min_y,
             max_x,
             max_y,
         };
         for coord in coords {
-            map.grid[coord.1 - min_y][coord.0 - min_x] = Fill::Rock;
+            map.fill_at(coord, Fill::Rock);
         }
+
         map
     }
 
@@ -171,20 +215,12 @@ impl Map {
         coords
     }
 
-    pub fn get_fill_at(&self, pos: Coord) -> Fill {
-        println!(
-            "actual {:?}, norm {} - {}, {} - {}",
-            pos, pos.0, self.min_x, pos.1, self.min_y
-        );
-        self.grid[pos.0 - self.min_x][pos.1]
+    pub fn get_fill_at(&self, pos: &Coord) -> Fill {
+        self.grid[pos.1][ Self::PADDING + pos.0 - self.min_x]
     }
 
     pub fn fill_at(&mut self, pos: Coord, fill: Fill) {
-        println!(
-            "actual {:?}, norm {} - {}, {} - {}",
-            pos, pos.0, self.min_x, pos.1, self.min_y
-        );
-        self.grid[pos.0 - self.min_x][pos.1] = fill;
+        self.grid[pos.1][Self::PADDING + pos.0 - self.min_x] = fill;
     }
 }
 
