@@ -162,8 +162,6 @@ impl Map {
                 Self::PADDING + max_y - min_y 
             ],
             min_x,
-            min_y,
-            max_x,
             max_y,
         };
         for coord in coords {
