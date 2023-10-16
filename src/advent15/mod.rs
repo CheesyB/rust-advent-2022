@@ -90,26 +90,8 @@ pub fn advent15_2() -> String {
         let coords = parse_line(line);
         sensor_beacon.push((coords.0, coords.1, manhattan_distance(coords.0, coords.1)));
     }
-    let max: u64 = 4000000;
-    let num_of_threads = 8;
-    let mut children = vec![];
-    let intermediate = (0..=num_of_threads)
-        .map(|x| x * max / num_of_threads)
-        .collect::<Vec<u64>>();
-    for (count, range) in intermediate.windows(2).enumerate() {
-        let tmp_count = count.clone();
-        let tmp_range = range.to_vec().clone();
-        let tmp_sensor_beacon = sensor_beacon.clone();
-        let tmp = thread::spawn(move || check_range(tmp_count, tmp_range, tmp_sensor_beacon));
-        children.push(tmp);
-    }
-    let mut results = vec![];
-    for j in children.into_iter() {
-        results.push(j.join().unwrap());
-    }
-
-    let distress_signal_pos: Vec<Coord> = results.iter().filter_map(|r| *r).collect();
-    dbg!(distress_signal_pos);
+    let mut distress_signal = Coord(0, 0);
+    dbg!(distress_signal);
     let tuning_frequency = 666; // distress_signal_pos.0 * 4000000 + distress_signal_pos.1;
     tuning_frequency.to_string()
 }
