@@ -46,7 +46,7 @@ fn main() -> Result<(), std::io::Error> {
         advent14::advent14(),
         advent14::advent14_2(),
         "advent15::advent15(), // lasts too long:)".to_string(),
-        advent15::advent15_2(),
+        "advent15::advent15_2(), // lasts too long:)".to_string(),
     ];
     println!();
     for (i, res) in results.iter().enumerate() {

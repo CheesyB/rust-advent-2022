@@ -49,51 +49,29 @@ pub fn advent15() -> String {
 
 pub fn advent15_2() -> String {
     let content = helper::read_puzzle_input("./src/advent15/beacon.txt");
-    let mut areas = vec![];
-    for line in content.lines() {
+    let mut points = vec![];
+    let mut sensors = vec![];
+    for (count, line) in content.lines().enumerate() {
+        println!("line: {}/23", count);
         let (sensor, beacon) = parse_line(line);
         let mhd = manhattan_distance(sensor, beacon) as i64;
-        areas.push(Area::new(sensor, mhd));
+        sensors.push((sensor, mhd));
+        points.extend(potential_beacon(sensor, mhd));
     }
-
-    let mut A_dir = vec![];
-    let mut B_dir = vec![];
-    let mut C_dir = vec![];
-    let mut D_dir = vec![];
-    for area in areas {
-        A_dir.push(area.A);
-        B_dir.push(area.B);
-        C_dir.push(area.C);
-        D_dir.push(area.D);
-    }
-
-    let mut upwards = vec![];
-    let mut downwards = vec![];
-
-    for a in A_dir.iter() {
-        for c in C_dir.iter() {
-            let dist = distance(1, a.1, c.1);
-            if dist - 0.707 < 0.01 {
-                upwards.push((a, c));
-                println!("found something {:?} {:?}", a, c)
+    println!("len: {}", points.len());
+    let mut distress_signal = vec![];
+    'distress: for potential_beacon in points {
+        for (sensor, sensor_coverage) in sensors.iter() {
+            let mhd = manhattan_distance(*sensor, potential_beacon);
+            if mhd as i64 <= *sensor_coverage {
+                continue 'distress;
             }
         }
-    }
-    println!();
-    for b in B_dir.iter() {
-        for d in D_dir.iter() {
-            let dist = distance(-1, b.1, d.1);
-            if dist - 0.707 < 0.01 {
-                downwards.push((b, d));
-                println!("found something {:?} {:?}", b, d)
-            }
-        }
+        distress_signal.push(potential_beacon);
     }
 
-    let mut distress_signal = Coord(0, 0);
-
-    dbg!(distress_signal);
-    let tuning_frequency = 666; // distress_signal_pos.0 * 4000000 + distress_signal_pos.1;
+    dbg!(&distress_signal);
+    let tuning_frequency = distress_signal[0].0 * 4000000 + distress_signal[0].1;
     tuning_frequency.to_string()
 }
 
@@ -116,33 +94,5 @@ mod tests {
         let target = Coord(2, 10);
         let res = manhattan_distance(source, target);
         assert_eq!(res, 13);
-    }
-
-    #[test]
-    fn test_distance() {
-        let c1 = Coord(1, 1);
-        let c2 = Coord(1, 2);
-        let dist = distance(Coord(1, 1), c1, c2);
-        dbg!(dist);
-        assert!(false);
-    }
-
-    #[test]
-    fn test_cross() {
-        let c1 = Coord(1, 1);
-        let c2 = Coord(1, -1);
-        let dist = c1.cross(c2);
-        dbg!(dist);
-        assert!(false);
-    }
-    #[test]
-    fn test_area_distance() {
-        let source = Coord(10, 10);
-        let target = Coord(10, 11);
-        let mhd = manhattan_distance(source, target);
-        let area = Area::new(source, mhd as i64);
-        let dist = distance(area.A.1, area.A.0, area.C.0);
-        dbg!(dist);
-        assert!(false);
     }
 }

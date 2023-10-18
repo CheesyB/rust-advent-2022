@@ -25,27 +25,32 @@ impl Coord {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct Area {
-    pub A: (i64, i64),
-    pub B: (i64, i64),
-    pub C: (i64, i64),
-    pub D: (i64, i64),
-}
+pub fn potential_beacon(sensor: Coord, mhd: i64) -> Vec<Coord> {
+    let a = Coord(sensor.0, sensor.1 - mhd - 1);
+    let b = Coord(sensor.0 + mhd + 1, sensor.1);
+    let c = Coord(sensor.0, sensor.1 + mhd + 1);
+    let d = Coord(sensor.0 - mhd - 1, sensor.1);
 
-impl Area {
-    pub fn new(sensor: Coord, mhd: i64) -> Area {
-        let a = Coord(sensor.0, sensor.1 - mhd);
-        let b = Coord(sensor.0 + mhd, sensor.1);
-        let c = Coord(sensor.0, sensor.1 + mhd);
-        let d = Coord(sensor.0 - mhd, sensor.1);
-        Area {
-            A: (1, a.1 - a.0),
-            B: (-1, b.1 + b.0),
-            C: (1, c.1 - c.0),
-            D: (-1, d.1 + d.0),
+    let mut potential_points = vec![];
+    for (norm, source, target) in [
+        (Coord(1, 1), a, b),
+        (Coord(-1, 1), b, c),
+        (Coord(-1, -1), c, d),
+        (Coord(1, -1), d, a),
+    ] {
+        let mut new_point = source;
+        while new_point != target {
+            if new_point.0 >= 0
+                && new_point.1 >= 0
+                && new_point.0 <= 4000000
+                && new_point.1 <= 4000000
+            {
+                potential_points.push(new_point);
+            }
+            new_point = new_point + norm;
         }
     }
+    potential_points
 }
 
 pub fn distance(m: i64, c1: i64, c2: i64) -> f64 {
