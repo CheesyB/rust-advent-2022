@@ -5,6 +5,7 @@ mod advent12;
 mod advent13;
 mod advent14;
 mod advent15;
+mod advent16;
 mod advent2;
 mod advent3;
 mod advent4;
@@ -47,6 +48,8 @@ fn main() -> Result<(), std::io::Error> {
         advent14::advent14_2(),
         "advent15::advent15(), // lasts too long:)".to_string(),
         "advent15::advent15_2(), // lasts too long:)".to_string(),
+        "advent16::advent16(), // lasts too long:)".to_string(),
+        advent16::advent16_2(),
     ];
     println!();
     for (i, res) in results.iter().enumerate() {

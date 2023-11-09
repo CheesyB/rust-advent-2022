@@ -51,14 +51,12 @@ pub fn advent15_2() -> String {
     let content = helper::read_puzzle_input("./src/advent15/beacon.txt");
     let mut points = vec![];
     let mut sensors = vec![];
-    for (count, line) in content.lines().enumerate() {
-        println!("line: {}/23", count);
+    for (_count, line) in content.lines().enumerate() {
         let (sensor, beacon) = parse_line(line);
         let mhd = manhattan_distance(sensor, beacon) as i64;
         sensors.push((sensor, mhd));
         points.extend(potential_beacon(sensor, mhd));
     }
-    println!("len: {}", points.len());
     let mut distress_signal = vec![];
     'distress: for potential_beacon in points {
         for (sensor, sensor_coverage) in sensors.iter() {
