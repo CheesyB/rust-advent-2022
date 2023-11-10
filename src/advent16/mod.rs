@@ -23,7 +23,7 @@ pub fn advent16() -> String {
 }
 
 pub fn advent16_2() -> String {
-    let content = helper::read_puzzle_input("./src/advent16/pressure_test.txt");
+    let content = helper::read_puzzle_input("./src/advent16/pressure.txt");
     let mut input = vec![];
     for line in content.lines() {
         let (_, junk) = parse_line(line).ok().unwrap();
