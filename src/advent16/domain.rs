@@ -1,8 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, vec};
 
+use itertools::Itertools;
 use nom::error_node_position;
 
-type JName = [char; 2];
+pub type JName = [char; 2];
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Junction {
@@ -48,12 +49,48 @@ impl<'a> Network {
     pub fn get_connection(&self, name: &JName) -> &Vec<JName> {
         self.connection.get(name).unwrap()
     }
+
+    pub fn get_flow_map(&self) -> HashMap<JName, u32> {
+        let mut tmp = HashMap::new();
+        let junk = self.get_flow_junctions();
+        for j in junk.iter() {
+            tmp.insert(j.clone(), self.get_junction(j).flow);
+        }
+        tmp
+    }
     pub fn get_flow_junctions(&self) -> Vec<JName> {
         self.nodes
             .iter()
             .filter(|n| self.get_junction(n.0).flow > 0)
             .map(|n| n.1.name)
             .collect()
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
+pub struct ERoute {
+    pub path: Vec<JName>,
+    pub route: Vec<JName>,
+}
+
+impl ERoute {
+    pub fn new(path: Vec<JName>, route: Vec<JName>) -> ERoute {
+        ERoute {
+            path: path,
+            route: route,
+        }
+    }
+    pub fn score(&self, network: &Network) -> u32 {
+        let mut pressure: [u32; 26] = [0; 26];
+        let flow_map = network.get_flow_map();
+        for (i, r) in self.route.iter().enumerate() {
+            if i > 0 && r == self.route.get(i - 1).unwrap() {
+                let additional_rpm = flow_map.get(r).unwrap();
+                for j in (i)..26 {
+                    pressure[j] += additional_rpm
+                }
+            }
+        }
+        pressure.iter().fold(0, |acc, val| acc + val)
     }
 }
 
@@ -87,61 +124,5 @@ impl Route {
             .iter()
             .take(min_passed as usize)
             .fold(0, |acc, val| acc + val)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct ERoute {
-    pub my_path: Vec<JName>,
-    pub ele_path: Vec<JName>,
-    pub pressure: [u32; 26],
-    pub debug: Vec<(usize, u32, JName)>,
-    pub opened_valves: Vec<JName>,
-}
-
-impl ERoute {
-    pub fn new(name: JName) -> ERoute {
-        ERoute {
-            my_path: vec![name],
-            ele_path: vec![name],
-            pressure: [0; 26],
-            debug: vec![],
-            opened_valves: vec![],
-        }
-    }
-    pub fn is_still_closed(&self, name: &JName) -> bool {
-        self.opened_valves.iter().find(|n| *n == name).is_none()
-    }
-    pub fn open_valve(&mut self, min_passed: usize, additional_ppm: u32, jname: &JName) {
-        for i in min_passed..26 {
-            self.pressure[i] += additional_ppm
-        }
-        self.opened_valves.push(jname.clone());
-        self.debug.push((min_passed, additional_ppm, jname.clone()));
-    }
-    pub fn pressure(&self, min_passed: u32) -> u32 {
-        self.pressure
-            .iter()
-            .take(min_passed as usize)
-            .fold(0, |acc, val| acc + val)
-    }
-
-    pub fn score(&self, min_passed: u32) -> f32 {
-        self.pressure
-            .iter()
-            .take(min_passed as usize)
-            .enumerate()
-            .fold(0.0, |acc, val| {
-                acc as f32 + (*val.1 as f32 * (min_passed as f32 - val.0 as f32 * 0.2))
-            })
-    }
-    pub fn print_paths(&self) {
-        println!("my: {:?}", self.my_path);
-        println!("ele: {:?}", self.ele_path);
-        println!();
-    }
-
-    pub fn are_all_valves_open(&self) -> bool {
-        self.opened_valves.len() == 6
     }
 }

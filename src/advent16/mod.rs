@@ -30,15 +30,7 @@ pub fn advent16_2() -> String {
         input.push(junk);
     }
     let network: Network = Network::new(input);
-    let result = start_ele_explore(&network);
-    let max_score = result
-        .iter()
-        .map(|route| route.score(30) as u32)
-        .max()
-        .unwrap();
-    let max_pressure = result.iter().map(|route| route.pressure(30)).max().unwrap();
-    // to high 8680
-    max_score.to_string()
+    start_ele_explore(&network).to_string()
 }
 
 #[cfg(test)]
