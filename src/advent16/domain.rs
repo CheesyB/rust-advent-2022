@@ -84,6 +84,7 @@ impl ERoute {
         let flow_map = network.get_flow_map();
         for (i, r) in self.route.iter().enumerate() {
             if i > 0 && r == self.route.get(i - 1).unwrap() {
+                println!("{:?}", r);
                 let additional_rpm = flow_map.get(r).unwrap();
                 for j in (i)..26 {
                     pressure[j] += additional_rpm
