@@ -17,11 +17,7 @@ fn ele_explore(network: &Network, start: Route) -> u32 {
     let flow_len = flows.len();
 
     for i in 2..=flows.len() {
-        let e_routes = flows
-            .iter()
-            .permutations(i)
-            .map(|x| x.iter().map(|&c| c.clone()).collect_vec())
-            .collect_vec();
+        let e_routes = flows.iter().permutations(i).collect_vec();
         tmp.insert(i, e_routes);
     }
 
