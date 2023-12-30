@@ -6,6 +6,7 @@ mod advent13;
 mod advent14;
 mod advent15;
 mod advent16;
+mod advent17;
 mod advent2;
 mod advent3;
 mod advent4;
