@@ -36,6 +36,25 @@ const CUBE: Shape = Shape::new(&[
     Point::new(1, 1),
 ]);
 
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+pub struct Shape {
+    rel_pts: &'static [Point],
+    ref_pt: Point,
+}
+
+impl Shape {
+    pub const fn new(relative_pts: &'static [Point]) -> Shape {
+        Shape {
+            rel_pts: relative_pts,
+            ref_pt: Point::new(0, 0),
+        }
+    }
+    pub fn shift(&mut self, move_to: &Point) {
+        self.ref_pt = move_to + self.ref_pt;
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Shapes {
     Plus,
     Minus,
@@ -56,7 +75,8 @@ impl Shapes {
     }
 }
 
-struct Point {
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+pub struct Point {
     x: i32,
     y: i32,
 }
@@ -69,7 +89,7 @@ impl Point {
 
 impl Sub for Point {
     type Output = Point;
-    fn sub(self, other: Point) -> <Self as Add<Point>>::Output {
+    fn sub(self, other: &Point) -> <Self as Add<Point>>::Output {
         Point {
             x: self.x - other.x,
             y: self.y - other.y,
@@ -79,27 +99,10 @@ impl Sub for Point {
 
 impl Add for Point {
     type Output = Point;
-    fn add(self, other: Point) -> <Self as Add<Point>>::Output {
+    fn add(self, other: &Point) -> <Self as Add<Point>>::Output {
         Point {
             x: self.x + other.x,
             y: self.y + other.y,
         }
-    }
-}
-
-struct Shape(pub &'static [Point]);
-
-// . . . .
-// . . . .
-// # # . .
-// # # . .
-//
-//
-//
-//
-
-impl Shape {
-    pub const fn new(relative_pts: &'static [Point]) -> Shape {
-        Shape(relative_pts)
     }
 }
