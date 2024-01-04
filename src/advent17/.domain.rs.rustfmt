@@ -1,0 +1,38 @@
+use std::ops::Add;
+use std::ops::Sub;
+
+pub enum Shapes {
+    Plus,
+    Minus,
+    L,
+    I,
+    Cube,
+}
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+impl Sub for Point {
+    type Output = Point;
+    fn sub(self, other: Point) -> <Self as Add<Point>>::Output {
+        Point {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+}
+
+impl Add for Point {
+    type Output = Point;
+    fn add(self, other: Point) -> <Self as Add<Point>>::Output {
+        Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+struct Shape<const N: usize> {
+    points: [Point; N],
+}
