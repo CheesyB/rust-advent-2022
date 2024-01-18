@@ -50,7 +50,8 @@ fn main() -> Result<(), std::io::Error> {
         "advent15::advent15(), // lasts too long:)".to_string(),
         "advent15::advent15_2(), // lasts too long:)".to_string(),
         "advent16::advent16(), // lasts too long:)".to_string(),
-        advent16::advent16_2(),
+        "advent16::advent16_2() // lasts to long:)".to_string(),
+        advent17::advent17(),
     ];
     println!();
     for (i, res) in results.iter().enumerate() {
