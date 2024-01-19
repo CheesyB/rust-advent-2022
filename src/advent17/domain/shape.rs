@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::advent17::domain::point::Point;
 
 use super::direction::Direction;
@@ -7,14 +9,22 @@ pub struct Shape {
     pub rel_pts: &'static [Point],
     pub ref_pt: Point,
     pub hight: i32,
+    char: char,
+}
+
+impl Display for Shape {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{0}", self.char)
+    }
 }
 
 impl Shape {
-    pub const fn new(relative_pts: &'static [Point], hight: i32) -> Shape {
+    pub const fn new(relative_pts: &'static [Point], hight: i32, char: char) -> Shape {
         Shape {
             rel_pts: relative_pts,
             ref_pt: Point::new(0, 0),
             hight,
+            char,
         }
     }
 
@@ -23,7 +33,7 @@ impl Shape {
     }
 
     pub fn get_max_hight(&self) -> i32 {
-        self.hight + self.ref_pt.y
+        self.hight + self.ref_pt.y - 1
     }
 
     pub fn shift_to_pt(&mut self, move_to: &Point) {

@@ -12,6 +12,7 @@ pub const PLUS: Shape = Shape::new(
         Point::new(1, 2),
     ],
     3,
+    '+',
 );
 pub const MINUS: Shape = Shape::new(
     &[
@@ -21,6 +22,7 @@ pub const MINUS: Shape = Shape::new(
         Point::new(3, 0),
     ],
     1,
+    '-',
 );
 
 pub const L: Shape = Shape::new(
@@ -32,6 +34,7 @@ pub const L: Shape = Shape::new(
         Point::new(2, 2),
     ],
     3,
+    'L',
 );
 
 pub const I: Shape = Shape::new(
@@ -42,6 +45,7 @@ pub const I: Shape = Shape::new(
         Point::new(0, 3),
     ],
     4,
+    'I',
 );
 pub const CUBE: Shape = Shape::new(
     &[
@@ -51,24 +55,5 @@ pub const CUBE: Shape = Shape::new(
         Point::new(1, 1),
     ],
     2,
+    'C',
 );
-
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
-pub enum Shapes {
-    Plus,
-    Minus,
-    L,
-    I,
-    Cube,
-}
-impl Shapes {
-    pub fn value(&self) -> &Shape {
-        match self {
-            Shapes::Plus => &PLUS,
-            Shapes::Minus => &MINUS,
-            Shapes::L => &L,
-            Shapes::I => &I,
-            Shapes::Cube => &CUBE,
-        }
-    }
-}
