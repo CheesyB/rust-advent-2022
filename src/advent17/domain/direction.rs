@@ -1,6 +1,6 @@
 use super::point::{Point, ONE_DOWN, ONE_LEFT, ONE_RIGHT};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Direction {
     LEFT,
     RIGHT,

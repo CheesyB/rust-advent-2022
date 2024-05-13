@@ -4,7 +4,7 @@ use crate::advent17::domain::point::Point;
 
 use super::direction::Direction;
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Shape {
     pub rel_pts: &'static [Point],
     pub ref_pt: Point,
@@ -30,6 +30,9 @@ impl Shape {
 
     pub fn get_points(&self) -> Vec<Point> {
         self.rel_pts.iter().map(|pt| self.ref_pt + pt).collect()
+    }
+    pub fn ref_pt_relative(&self, rel_to_hight: i32) -> Point {
+        Point::new(self.ref_pt.x, self.ref_pt.y - rel_to_hight)
     }
 
     pub fn get_max_hight(&self) -> i32 {

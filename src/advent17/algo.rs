@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use super::domain::direction::Direction;
 use super::domain::point::Point;
 use super::domain::shape::Shape;
@@ -5,9 +7,87 @@ use super::domain::shapes::SHAPE_ORDER;
 
 const CHAMBER_WIDTH: i32 = 7;
 
-pub fn simulate(input: &str, rested_shapes: &mut Vec<Shape>, iterrations: usize) -> i64 {
+pub fn simulate2(input: &str, iterrations: usize) -> i64 {
     let mut shape_cycle = SHAPE_ORDER.iter().cycle().enumerate().take(iterrations);
     let mut dir_cycle = input.chars().cycle();
+    let mut rested_shapes: Vec<Shape> = vec![];
+    let mut seen: Vec<(Vec<Point>, Direction, (i32, i32))> = vec![];
+    let mut again = true;
+    'outer: while let Some((count, mut shape)) = shape_cycle.next().map(|s| (s.0, s.1.clone())) {
+        let spawn = get_spawn_point(&rested_shapes);
+        shape.shift_to_pt(&spawn);
+        if rested_shapes.len() > 10 {
+            rested_shapes.drain(0..1);
+        }
+        while let Some(direction) = dir_cycle.next().map(|dir| Direction::from(&dir)) {
+            let current_skyline = skyline(&rested_shapes, direction);
+            for (ccount, ssk) in seen.iter().enumerate().skip(10091) {
+                if ssk
+                    .0
+                    .iter()
+                    .zip(current_skyline.0.iter())
+                    .all(|(p1, p2)| p1 == p2)
+                    && ssk.1 == current_skyline.1
+                    && again
+                {
+                    again = false;
+
+                    println!(" {} found at {} ", count, ccount);
+
+                    break;
+                }
+            }
+
+            match has_no_collision(direction, &shape, &rested_shapes) {
+                true => {
+                    shape.shift(direction);
+                }
+                false => {
+                    seen.push(skyline(&rested_shapes, direction));
+                }
+            }
+            match has_no_collision(Direction::DOWN, &shape, &rested_shapes) {
+                true => {
+                    shape.shift(Direction::DOWN);
+                }
+                false => {
+                    rested_shapes.push(shape);
+                    seen.push(skyline(&rested_shapes, direction));
+                    continue 'outer;
+                }
+            }
+        }
+    }
+    rested_shapes.last().unwrap().get_max_hight() as i64
+}
+
+fn skyline(
+    rested_shapes: &Vec<Shape>,
+    direction: Direction,
+) -> (Vec<Point>, Direction, (i32, i32)) {
+    let high = rested_shapes
+        .iter()
+        .map(|sh| sh.get_max_hight())
+        .max()
+        .unwrap_or_default();
+    let low = rested_shapes
+        .iter()
+        .map(|sh| sh.ref_pt.y)
+        .min()
+        .unwrap_or_default();
+    let significant = rested_shapes
+        .iter()
+        .rev()
+        .take(5)
+        .map(|sh| sh.ref_pt_relative(low))
+        .collect_vec();
+    (significant, direction, (high, low))
+}
+
+pub fn simulate(input: &str, iterrations: usize) -> i64 {
+    let mut shape_cycle = SHAPE_ORDER.iter().cycle().enumerate().take(iterrations);
+    let mut dir_cycle = input.chars().cycle();
+    let mut rested_shapes: Vec<Shape> = vec![];
     'outer: while let Some((count, mut shape)) = shape_cycle.next().map(|s| (s.0, s.1.clone())) {
         let spawn = get_spawn_point(&rested_shapes);
         shape.shift_to_pt(&spawn);
